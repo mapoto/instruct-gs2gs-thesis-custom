@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Instruct-NeRF2NeRF configuration file.
+Instruct-GS2GS configuration file.
 """
 
 from nerfstudio.cameras.camera_optimizers import CameraOptimizerConfig
@@ -23,35 +23,31 @@ from nerfstudio.engine.optimizers import AdamOptimizerConfig
 from nerfstudio.engine.schedulers import ExponentialDecaySchedulerConfig
 from nerfstudio.plugins.types import MethodSpecification
 
-from in2n.in2n_datamanager import InstructNeRF2NeRFDataManagerConfig
-from in2n.in2n import InstructNeRF2NeRFModelConfig
-from in2n.in2n_pipeline import InstructNeRF2NeRFPipelineConfig
-from in2n.in2n_trainer import InstructNeRF2NeRFTrainerConfig
+from igs2gs.igs2gs_datamanager import InstructGS2GSDataManagerConfig
+from igs2gs.igs2gs import InstructGS2GSModelConfig
+from igs2gs.igs2gs_pipeline import InstructGS2GSPipelineConfig
+from igs2gs.igs2gs_trainer import InstructGS2GSTrainerConfig
 
-in2n_method = MethodSpecification(
-    config=InstructNeRF2NeRFTrainerConfig(
-        method_name="in2n",
+igs2gs_method = MethodSpecification(
+    config=InstructGS2GSTrainerConfig(
+        method_name="igs2gs",
         steps_per_eval_batch=1000,
         steps_per_eval_image=100,
         steps_per_save=250,
         max_num_iterations=15000,
         save_only_latest_checkpoint=True,
         mixed_precision=True,
-        pipeline=InstructNeRF2NeRFPipelineConfig(
-            datamanager=InstructNeRF2NeRFDataManagerConfig(
+        pipeline=InstructGS2GSPipelineConfig(
+            datamanager=InstructGS2GSDataManagerConfig(
                 dataparser=NerfstudioDataParserConfig(),
                 train_num_rays_per_batch=16384,
                 eval_num_rays_per_batch=4096,
                 patch_size=32,
-                camera_optimizer=CameraOptimizerConfig(
-                    mode="SO3xR3",
-                    optimizer=AdamOptimizerConfig(lr=6e-4, eps=1e-8, weight_decay=1e-2),
-                    scheduler=ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=200000),
-                ),
             ),
-            model=InstructNeRF2NeRFModelConfig(
+            model=InstructGS2GSModelConfig(
                 eval_num_rays_per_chunk=1 << 15,
                 use_lpips=True,
+                camera_optimizer=CameraOptimizerConfig(mode="SO3xR3"),
             ),
             ip2p_use_full_precision=True
         ),
@@ -64,37 +60,37 @@ in2n_method = MethodSpecification(
                 "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
             },
+            "camera_opt": {
+                "optimizer": AdamOptimizerConfig(lr=6e-4, eps=1e-8, weight_decay=1e-2),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=5000),
+            },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",
     ),
-    description="Instruct-NeRF2NeRF primary method: uses LPIPS, IP2P at full precision",
+    description="Instruct-GS2GS primary method: uses LPIPS, IP2P at full precision",
 )
 
-in2n_method_small = MethodSpecification(
-    config=InstructNeRF2NeRFTrainerConfig(
-        method_name="in2n-small",
+igs2gs_method_small = MethodSpecification(
+    config=InstructGS2GSTrainerConfig(
+        method_name="igs2gs-small",
         steps_per_eval_batch=1000,
         steps_per_eval_image=100,
         steps_per_save=250,
         max_num_iterations=30000,
         save_only_latest_checkpoint=True,
         mixed_precision=True,
-        pipeline=InstructNeRF2NeRFPipelineConfig(
-            datamanager=InstructNeRF2NeRFDataManagerConfig(
+        pipeline=InstructGS2GSPipelineConfig(
+            datamanager=InstructGS2GSDataManagerConfig(
                 dataparser=NerfstudioDataParserConfig(),
                 train_num_rays_per_batch=16384,
                 eval_num_rays_per_batch=4096,
                 patch_size=32,
-                camera_optimizer=CameraOptimizerConfig(
-                    mode="SO3xR3",
-                    optimizer=AdamOptimizerConfig(lr=6e-4, eps=1e-8, weight_decay=1e-2),
-                    scheduler=ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=200000),
-                ),
             ),
-            model=InstructNeRF2NeRFModelConfig(
+            model=InstructGS2GSModelConfig(
                 eval_num_rays_per_chunk=1 << 15,
                 use_lpips=True,
+                camera_optimizer=CameraOptimizerConfig(mode="SO3xR3"),
             ),
             ip2p_use_full_precision=False,
         ),
@@ -107,37 +103,37 @@ in2n_method_small = MethodSpecification(
                 "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
             },
+            "camera_opt": {
+                "optimizer": AdamOptimizerConfig(lr=6e-4, eps=1e-8, weight_decay=1e-2),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=5000),
+            },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",
     ),
-    description="Instruct-NeRF2NeRF small method, uses LPIPs, IP2P at half precision",
+    description="Instruct-GS2GS small method, uses LPIPs, IP2P at half precision",
 )
 
-in2n_method_tiny = MethodSpecification(
-    config=InstructNeRF2NeRFTrainerConfig(
-        method_name="in2n-tiny",
+igs2gs_method_tiny = MethodSpecification(
+    config=InstructGS2GSTrainerConfig(
+        method_name="igs2gs-tiny",
         steps_per_eval_batch=1000,
         steps_per_eval_image=100,
         steps_per_save=250,
         max_num_iterations=30000,
         save_only_latest_checkpoint=True,
         mixed_precision=True,
-        pipeline=InstructNeRF2NeRFPipelineConfig(
-            datamanager=InstructNeRF2NeRFDataManagerConfig(
+        pipeline=InstructGS2GSPipelineConfig(
+            datamanager=InstructGS2GSDataManagerConfig(
                 dataparser=NerfstudioDataParserConfig(),
                 train_num_rays_per_batch=4096,
                 eval_num_rays_per_batch=4096,
                 patch_size=1,
-                camera_optimizer=CameraOptimizerConfig(
-                    mode="SO3xR3",
-                    optimizer=AdamOptimizerConfig(lr=6e-4, eps=1e-8, weight_decay=1e-2),
-                    scheduler=ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=200000),
-                ),
             ),
-            model=InstructNeRF2NeRFModelConfig(
+            model=InstructGS2GSModelConfig(
                 eval_num_rays_per_chunk=1 << 15,
                 use_lpips=False,
+                camera_optimizer=CameraOptimizerConfig(mode="SO3xR3"),
             ),
             ip2p_use_full_precision=False,
         ),
@@ -150,9 +146,13 @@ in2n_method_tiny = MethodSpecification(
                 "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
             },
+            "camera_opt": {
+                "optimizer": AdamOptimizerConfig(lr=6e-4, eps=1e-8, weight_decay=1e-2),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=5000),
+            },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",
     ),
-    description="Instruct-NeRF2NeRF tiny method, does not use LPIPs, IP2P at half precision",
+    description="Instruct-GS2GS tiny method, does not use LPIPs, IP2P at half precision",
 )

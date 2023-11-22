@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Instruct-NeRF2NeRF Datamanager.
+Instruct-GS2GS Datamanager.
 """
 
 from __future__ import annotations
@@ -34,17 +34,17 @@ from nerfstudio.data.datamanagers.base_datamanager import (
 CONSOLE = Console(width=120)
 
 @dataclass
-class InstructNeRF2NeRFDataManagerConfig(VanillaDataManagerConfig):
-    """Configuration for the InstructNeRF2NeRFDataManager."""
+class InstructGS2GSDataManagerConfig(VanillaDataManagerConfig):
+    """Configuration for the InstructGS2GSDataManager."""
 
-    _target: Type = field(default_factory=lambda: InstructNeRF2NeRFDataManager)
+    _target: Type = field(default_factory=lambda: InstructGS2GSDataManager)
     patch_size: int = 32
     """Size of patch to sample from. If >1, patch-based sampling will be used."""
 
-class InstructNeRF2NeRFDataManager(VanillaDataManager):
-    """Data manager for InstructNeRF2NeRF."""
+class InstructGS2GSDataManager(VanillaDataManager):
+    """Data manager for InstructGS2GS."""
 
-    config: InstructNeRF2NeRFDataManagerConfig
+    config: InstructGS2GSDataManagerConfig
 
     def setup_train(self):
         """Sets up the data loaders for training"""
@@ -61,13 +61,7 @@ class InstructNeRF2NeRFDataManager(VanillaDataManager):
         )
         self.iter_train_image_dataloader = iter(self.train_image_dataloader)
         self.train_pixel_sampler = self._get_pixel_sampler(self.train_dataset, self.config.train_num_rays_per_batch)
-        self.train_camera_optimizer = self.config.camera_optimizer.setup(
-            num_cameras=self.train_dataset.cameras.size, device=self.device
-        )
-        self.train_ray_generator = RayGenerator(
-            self.train_dataset.cameras.to(self.device),
-            self.train_camera_optimizer,
-        )
+        self.train_ray_generator = RayGenerator(self.train_dataset.cameras.to(self.device),)
 
         # pre-fetch the image batch (how images are replaced in dataset)
         self.image_batch = next(self.iter_train_image_dataloader)

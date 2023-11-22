@@ -23,13 +23,13 @@ from nerfstudio.viewer.server.viewer_elements import ViewerButton
 from nerfstudio.utils.decorators import check_main_thread
 
 @dataclass
-class InstructNeRF2NeRFTrainerConfig(TrainerConfig):
-    """Configuration for the InstructNeRF2NeRFTrainer."""
-    _target: Type = field(default_factory=lambda: InstructNeRF2NeRFTrainer)
+class InstructGS2GSTrainerConfig(TrainerConfig):
+    """Configuration for the InstructGS2GSTrainer."""
+    _target: Type = field(default_factory=lambda: InstructGS2GSTrainer)
 
 
-class InstructNeRF2NeRFTrainer(Trainer):
-    """Trainer for InstructNeRF2NeRF"""
+class InstructGS2GSTrainer(Trainer):
+    """Trainer for InstructGS2GS"""
 
     def __init__(self, config: TrainerConfig, local_rank: int = 0, world_size: int = 1) -> None:
 

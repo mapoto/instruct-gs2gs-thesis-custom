@@ -111,7 +111,7 @@ class InstructPix2Pix(nn.Module):
         lower_bound: float = 0.70,
         upper_bound: float = 0.98
     ) -> torch.Tensor:
-        """Edit an image for Instruct-NeRF2NeRF using InstructPix2Pix
+        """Edit an image for Instruct-GS2GS using InstructPix2Pix
         Args:
             text_embeddings: Text embeddings
             image: rendered image to edit

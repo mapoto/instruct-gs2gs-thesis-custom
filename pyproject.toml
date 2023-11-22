@@ -1,5 +1,5 @@
 [project]
-name = "in2n"
+name = "igs2gs"
 version = "0.1.0"
 
 dependencies=[
@@ -36,9 +36,9 @@ disable = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["in2n"]
+include = ["igs2gs"]
 
 [project.entry-points.'nerfstudio.method_configs']
-in2n = 'in2n.in2n_config:in2n_method'
-in2n_small = 'in2n.in2n_config:in2n_method_small'
-in2n_tiny = 'in2n.in2n_config:in2n_method_tiny'
+igs2gs = 'igs2gs.igs2gs_config:igs2gs_method'
+igs2gs_small = 'igs2gs.igs2gs_config:igs2gs_method_small'
+igs2gs_tiny = 'igs2gs.igs2gs_config:igs2gs_method_tiny'

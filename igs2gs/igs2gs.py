@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Model for InstructNeRF2NeRF
+Model for InstructGS2GS
 """
 
 from __future__ import annotations
@@ -31,9 +31,9 @@ from nerfstudio.model_components.losses import (
 from nerfstudio.models.nerfacto import NerfactoModel, NerfactoModelConfig
 
 @dataclass
-class InstructNeRF2NeRFModelConfig(NerfactoModelConfig):
-    """Configuration for the InstructNeRF2NeRFModel."""
-    _target: Type = field(default_factory=lambda: InstructNeRF2NeRFModel)
+class InstructGS2GSModelConfig(NerfactoModelConfig):
+    """Configuration for the InstructGS2GSModel."""
+    _target: Type = field(default_factory=lambda: InstructGS2GSModel)
     use_lpips: bool = True
     """Whether to use LPIPS loss"""
     use_l1: bool = True
@@ -43,10 +43,10 @@ class InstructNeRF2NeRFModelConfig(NerfactoModelConfig):
     lpips_loss_mult: float = 1.0
     """Multiplier for LPIPS loss."""
 
-class InstructNeRF2NeRFModel(NerfactoModel):
-    """Model for InstructNeRF2NeRF."""
+class InstructGS2GSModel(NerfactoModel):
+    """Model for InstructGS2GS."""
 
-    config: InstructNeRF2NeRFModelConfig
+    config: InstructGS2GSModelConfig
 
     def populate_modules(self):
         """Required to use L1 Loss."""

@@ -23,19 +23,19 @@ from typing_extensions import Literal
 from nerfstudio.pipelines.base_pipeline import VanillaPipeline, VanillaPipelineConfig
 from nerfstudio.viewer.server.viewer_elements import ViewerNumber, ViewerText
 
-from in2n.in2n_datamanager import (
-    InstructNeRF2NeRFDataManagerConfig,
+from igs2gs.igs2gs_datamanager import (
+    InstructGS2GSDataManagerConfig,
 )
-from in2n.ip2p import InstructPix2Pix
+from igs2gs.ip2p import InstructPix2Pix
 
 
 @dataclass
-class InstructNeRF2NeRFPipelineConfig(VanillaPipelineConfig):
+class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     """Configuration for pipeline instantiation"""
 
-    _target: Type = field(default_factory=lambda: InstructNeRF2NeRFPipeline)
+    _target: Type = field(default_factory=lambda: InstructGS2GSPipeline)
     """target class to instantiate"""
-    datamanager: InstructNeRF2NeRFDataManagerConfig = InstructNeRF2NeRFDataManagerConfig()
+    datamanager: InstructGS2GSDataManagerConfig = InstructGS2GSDataManagerConfig()
     """specifies the datamanager config"""
     prompt: str = "don't change the image"
     """prompt for InstructPix2Pix"""
@@ -58,14 +58,14 @@ class InstructNeRF2NeRFPipelineConfig(VanillaPipelineConfig):
     ip2p_use_full_precision: bool = True
     """Whether to use full precision for InstructPix2Pix"""
 
-class InstructNeRF2NeRFPipeline(VanillaPipeline):
-    """InstructNeRF2NeRF pipeline"""
+class InstructGS2GSPipeline(VanillaPipeline):
+    """InstructGS2GS pipeline"""
 
-    config: InstructNeRF2NeRFPipelineConfig
+    config: InstructGS2GSPipelineConfig
 
     def __init__(
         self,
-        config: InstructNeRF2NeRFPipelineConfig,
+        config: InstructGS2GSPipelineConfig,
         device: str,
         test_mode: Literal["test", "val", "inference"] = "val",
         world_size: int = 1,
@@ -142,7 +142,7 @@ class InstructNeRF2NeRFPipeline(VanillaPipeline):
                 current_index = self.datamanager.image_batch["image_idx"][current_spot]
 
                 # get current camera, include camera transforms from original optimizer
-                camera_transforms = self.datamanager.train_camera_optimizer(current_index.unsqueeze(dim=0))
+                camera_transforms = self.model.camera_optimizer(current_index.unsqueeze(dim=0))
                 current_camera = self.datamanager.train_dataparser_outputs.cameras[current_index].to(self.device)
                 current_ray_bundle = current_camera.generate_rays(torch.tensor(list(range(1))).unsqueeze(-1), camera_opt_to_camera=camera_transforms)
 
