@@ -28,10 +28,11 @@ from nerfstudio.model_components.losses import (
     MSELoss,
     interlevel_loss,
 )
-from nerfstudio.models.nerfacto import NerfactoModel, NerfactoModelConfig
+from nerfstudio.models.gaussian_splatting import GaussianSplattingModel, GaussianSplattingModelConfig
+
 
 @dataclass
-class InstructGS2GSModelConfig(NerfactoModelConfig):
+class InstructGS2GSModelConfig(GaussianSplattingModelConfig):
     """Configuration for the InstructGS2GSModel."""
     _target: Type = field(default_factory=lambda: InstructGS2GSModel)
     use_lpips: bool = True
@@ -43,11 +44,11 @@ class InstructGS2GSModelConfig(NerfactoModelConfig):
     lpips_loss_mult: float = 1.0
     """Multiplier for LPIPS loss."""
 
-class InstructGS2GSModel(NerfactoModel):
+class InstructGS2GSModel(GaussianSplattingModel):
     """Model for InstructGS2GS."""
 
     config: InstructGS2GSModelConfig
-
+    '''
     def populate_modules(self):
         """Required to use L1 Loss."""
         super().populate_modules()
@@ -57,7 +58,7 @@ class InstructGS2GSModel(NerfactoModel):
         else:
             self.rgb_loss = MSELoss()
         self.lpips = LearnedPerceptualImagePatchSimilarity()
-
+    
     def get_loss_dict(self, outputs, batch, metrics_dict=None):
         loss_dict = {}
         image = batch["image"].to(self.device)
@@ -85,3 +86,4 @@ class InstructGS2GSModel(NerfactoModel):
                     outputs["rendered_pred_normal_loss"]
                 )
         return loss_dict
+    '''

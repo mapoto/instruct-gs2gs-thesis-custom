@@ -22,137 +22,183 @@ from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataPars
 from nerfstudio.engine.optimizers import AdamOptimizerConfig
 from nerfstudio.engine.schedulers import ExponentialDecaySchedulerConfig
 from nerfstudio.plugins.types import MethodSpecification
+from nerfstudio.data.dataparsers.colmap_dataparser import ColmapDataParserConfig
+from nerfstudio.data.datamanagers.full_images_datamanager import FullImageDatamanagerConfig,FullImageDatamanager
+from nerfstudio.pipelines.base_pipeline import VanillaPipelineConfig
+from nerfstudio.models.gaussian_splatting import GaussianSplattingModelConfig
+from nerfstudio.engine.trainer import TrainerConfig
+
 
 from igs2gs.igs2gs_datamanager import InstructGS2GSDataManagerConfig
 from igs2gs.igs2gs import InstructGS2GSModelConfig
 from igs2gs.igs2gs_pipeline import InstructGS2GSPipelineConfig
 from igs2gs.igs2gs_trainer import InstructGS2GSTrainerConfig
 
+
 igs2gs_method = MethodSpecification(
     config=InstructGS2GSTrainerConfig(
         method_name="igs2gs",
-        steps_per_eval_batch=1000,
         steps_per_eval_image=100,
-        steps_per_save=250,
-        max_num_iterations=15000,
-        save_only_latest_checkpoint=True,
-        mixed_precision=True,
+        steps_per_eval_batch=100,
+        steps_per_save=2000,
+        steps_per_eval_all_images=100000, 
+        max_num_iterations=30000,
+        mixed_precision=False,
+        gradient_accumulation_steps = {'camera_opt': 100,'color':10,'shs':10},
         pipeline=InstructGS2GSPipelineConfig(
             datamanager=InstructGS2GSDataManagerConfig(
-                dataparser=NerfstudioDataParserConfig(),
-                train_num_rays_per_batch=16384,
-                eval_num_rays_per_batch=4096,
-                patch_size=32,
+                dataparser=ColmapDataParserConfig(load_3D_points=True),
             ),
-            model=InstructGS2GSModelConfig(
-                eval_num_rays_per_chunk=1 << 15,
-                use_lpips=True,
-                camera_optimizer=CameraOptimizerConfig(mode="SO3xR3"),
-            ),
-            ip2p_use_full_precision=True
+            model=InstructGS2GSModelConfig(),
         ),
         optimizers={
-            "proposal_networks": {
-                "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
+            "xyz": {
+                "optimizer": AdamOptimizerConfig(lr=1.6e-4, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1.6e-6,
+                    max_steps=30000,
+                ),
             },
-            "fields": {
-                "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
+            "color": {
+                "optimizer": AdamOptimizerConfig(lr=5e-4, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1e-4,
+                    max_steps=30000,
+                ),
+            },
+            "opacity": {
+                "optimizer": AdamOptimizerConfig(lr=0.05, eps=1e-15),
+                "scheduler": None,
+            },
+            "scaling": {
+                "optimizer": AdamOptimizerConfig(lr=0.005, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-3, max_steps=30000)
+            },
+            "rotation": {
+                "optimizer": AdamOptimizerConfig(lr=0.001, eps=1e-15),
+                "scheduler": None
             },
             "camera_opt": {
-                "optimizer": AdamOptimizerConfig(lr=6e-4, eps=1e-8, weight_decay=1e-2),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=5000),
+                "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=5e-5, max_steps=30000),
             },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",
     ),
     description="Instruct-GS2GS primary method: uses LPIPS, IP2P at full precision",
+
 )
+
 
 igs2gs_method_small = MethodSpecification(
     config=InstructGS2GSTrainerConfig(
         method_name="igs2gs-small",
-        steps_per_eval_batch=1000,
         steps_per_eval_image=100,
-        steps_per_save=250,
+        steps_per_eval_batch=100,
+        steps_per_save=2000,
+        steps_per_eval_all_images=100000, 
         max_num_iterations=30000,
-        save_only_latest_checkpoint=True,
-        mixed_precision=True,
+        mixed_precision=False,
+        gradient_accumulation_steps = {'camera_opt': 100,'color':10,'shs':10},
         pipeline=InstructGS2GSPipelineConfig(
             datamanager=InstructGS2GSDataManagerConfig(
-                dataparser=NerfstudioDataParserConfig(),
-                train_num_rays_per_batch=16384,
-                eval_num_rays_per_batch=4096,
-                patch_size=32,
+                dataparser=ColmapDataParserConfig(load_3D_points=True),
             ),
-            model=InstructGS2GSModelConfig(
-                eval_num_rays_per_chunk=1 << 15,
-                use_lpips=True,
-                camera_optimizer=CameraOptimizerConfig(mode="SO3xR3"),
-            ),
-            ip2p_use_full_precision=False,
+            model=InstructGS2GSModelConfig(),
         ),
         optimizers={
-            "proposal_networks": {
-                "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
+            "xyz": {
+                "optimizer": AdamOptimizerConfig(lr=1.6e-4, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1.6e-6,
+                    max_steps=30000,
+                ),
             },
-            "fields": {
-                "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
+            "color": {
+                "optimizer": AdamOptimizerConfig(lr=5e-4, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1e-4,
+                    max_steps=30000,
+                ),
+            },
+            "opacity": {
+                "optimizer": AdamOptimizerConfig(lr=0.05, eps=1e-15),
+                "scheduler": None,
+            },
+            "scaling": {
+                "optimizer": AdamOptimizerConfig(lr=0.005, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-3, max_steps=30000)
+            },
+            "rotation": {
+                "optimizer": AdamOptimizerConfig(lr=0.001, eps=1e-15),
+                "scheduler": None
             },
             "camera_opt": {
-                "optimizer": AdamOptimizerConfig(lr=6e-4, eps=1e-8, weight_decay=1e-2),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=5000),
+                "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=5e-5, max_steps=30000),
             },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",
     ),
-    description="Instruct-GS2GS small method, uses LPIPs, IP2P at half precision",
+    description="Instruct-GS2GS primary method: uses LPIPS, IP2P at full precision",
+
 )
 
 igs2gs_method_tiny = MethodSpecification(
     config=InstructGS2GSTrainerConfig(
         method_name="igs2gs-tiny",
-        steps_per_eval_batch=1000,
         steps_per_eval_image=100,
-        steps_per_save=250,
+        steps_per_eval_batch=100,
+        steps_per_save=2000,
+        steps_per_eval_all_images=100000, 
         max_num_iterations=30000,
-        save_only_latest_checkpoint=True,
-        mixed_precision=True,
+        mixed_precision=False,
+        gradient_accumulation_steps = {'camera_opt': 100,'color':10,'shs':10},
         pipeline=InstructGS2GSPipelineConfig(
             datamanager=InstructGS2GSDataManagerConfig(
-                dataparser=NerfstudioDataParserConfig(),
-                train_num_rays_per_batch=4096,
-                eval_num_rays_per_batch=4096,
-                patch_size=1,
+                dataparser=ColmapDataParserConfig(load_3D_points=True),
             ),
-            model=InstructGS2GSModelConfig(
-                eval_num_rays_per_chunk=1 << 15,
-                use_lpips=False,
-                camera_optimizer=CameraOptimizerConfig(mode="SO3xR3"),
-            ),
-            ip2p_use_full_precision=False,
+            model=InstructGS2GSModelConfig(),
         ),
         optimizers={
-            "proposal_networks": {
-                "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
+            "xyz": {
+                "optimizer": AdamOptimizerConfig(lr=1.6e-4, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1.6e-6,
+                    max_steps=30000,
+                ),
             },
-            "fields": {
-                "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
+            "color": {
+                "optimizer": AdamOptimizerConfig(lr=5e-4, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1e-4,
+                    max_steps=30000,
+                ),
+            },
+            "opacity": {
+                "optimizer": AdamOptimizerConfig(lr=0.05, eps=1e-15),
+                "scheduler": None,
+            },
+            "scaling": {
+                "optimizer": AdamOptimizerConfig(lr=0.005, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-3, max_steps=30000)
+            },
+            "rotation": {
+                "optimizer": AdamOptimizerConfig(lr=0.001, eps=1e-15),
+                "scheduler": None
             },
             "camera_opt": {
-                "optimizer": AdamOptimizerConfig(lr=6e-4, eps=1e-8, weight_decay=1e-2),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=5000),
+                "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=5e-5, max_steps=30000),
             },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",
     ),
-    description="Instruct-GS2GS tiny method, does not use LPIPs, IP2P at half precision",
+    description="Instruct-GS2GS primary method: uses LPIPS, IP2P at full precision",
+
 )
+
+
