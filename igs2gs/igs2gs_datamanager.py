@@ -124,7 +124,7 @@ class InstructGS2GSDataManager(FullImageDatamanager):
         self.original_cached_eval = deepcopy(self.cached_eval)
         
         # Some logic to make sure we sample every camera in equal amounts
-        self.editing_unseen_cameras = [i for i in range(len(self.original_cached_train))]
+        self.editing_unseen_cameras = [i for i in range(len(self.train_dataset))]
         
     def next_edited_image(self, step: int) -> Tuple[Cameras, Dict]:
         """Returns the next training batch

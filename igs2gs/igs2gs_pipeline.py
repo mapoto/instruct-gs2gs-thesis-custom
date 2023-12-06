@@ -57,7 +57,7 @@ class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     """Upper bound for diffusion timesteps to use for image editing"""
     ip2p_device: Optional[str] = None
     """Second device to place InstructPix2Pix on. If None, will use the same device as the pipeline"""
-    ip2p_use_full_precision: bool = True
+    ip2p_use_full_precision: bool = False
     """Whether to use full precision for InstructPix2Pix"""
     
 
@@ -112,33 +112,15 @@ class InstructGS2GSPipeline(VanillaPipeline):
             for i in range(self.config.edit_count):
                 
                 edit_camera, edit_data = self.datamanager.next_edited_image(step)
-                idx = edit_data["image_idx"].item()
-
-                # # iterate through "spot in dataset"
-                # current_spot = next(self.train_indices_order)
+                idx = edit_camera.metadata["cam_idx"]
                 
-                # # get original image from dataset
-                # original_image = self.datamanager.original_image_batch["image"][current_spot].to(self.device)
-                # # generate current index in datamanger
-                # current_index = self.datamanager.image_batch["image_idx"][current_spot]
-
-                # # get current camera, include camera transforms from original optimizer
-                # camera_transforms = self.model.camera_optimizer(current_index.unsqueeze(dim=0))
-                # current_camera = self.datamanager.train_dataparser_outputs.cameras[current_index].to(self.device)
-                # current_ray_bundle = current_camera.generate_rays(torch.tensor(list(range(1))).unsqueeze(-1), camera_opt_to_camera=camera_transforms)
+                original_image = self.datamanager.original_cached_train[idx]["image"]
 
                 # # get current render of nerf
                 original_image = original_image.unsqueeze(dim=0).permute(0, 3, 1, 2)
-                camera_outputs = self.model.get_outputs_for_camera_ray_bundle(edit_camera)
+                camera_outputs = self.model.get_outputs(edit_camera) # this line causes a bug later, need to debug
                 rendered_image = camera_outputs["rgb"].unsqueeze(dim=0).permute(0, 3, 1, 2)
-
-                # # delete to free up memory
-                # del camera_outputs
-                # del current_camera
-                # del current_ray_bundle
-                # del camera_transforms
-                # torch.cuda.empty_cache()
-
+                
                 edited_image = self.ip2p.edit_image(
                             self.text_embedding.to(self.ip2p_device),
                             rendered_image.to(self.ip2p_device),
@@ -155,7 +137,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
                     edited_image = torch.nn.functional.interpolate(edited_image, size=rendered_image.size()[2:], mode='bilinear')
 
                 # write edited image to dataloader
-                self.cached_train[idx] = edited_image.squeeze().permute(1,2,0)
+                self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
 
         loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
 

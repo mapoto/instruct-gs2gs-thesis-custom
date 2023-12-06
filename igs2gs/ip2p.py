@@ -16,6 +16,7 @@
 
 # Modified from https://github.com/ashawkey/stable-dreamfusion/blob/main/nerf/sd.py
 
+import pdb
 import sys
 from dataclasses import dataclass
 from typing import Union
@@ -182,7 +183,7 @@ class InstructPix2Pix(nn.Module):
         latents = 1 / CONST_SCALE * latents
 
         with torch.no_grad():
-            imgs = self.auto_encoder.decode(latents).sample
+            imgs = self.auto_encoder.decode(latents.to(self.auto_encoder.dtype)).sample
 
         imgs = (imgs / 2 + 0.5).clamp(0, 1)
 
@@ -197,7 +198,7 @@ class InstructPix2Pix(nn.Module):
         """
         imgs = 2 * imgs - 1
 
-        posterior = self.auto_encoder.encode(imgs).latent_dist
+        posterior = self.auto_encoder.encode(imgs.to(self.auto_encoder.dtype)).latent_dist
         latents = posterior.sample() * CONST_SCALE
 
         return latents
@@ -211,7 +212,7 @@ class InstructPix2Pix(nn.Module):
         """
         imgs = 2 * imgs - 1
 
-        image_latents = self.auto_encoder.encode(imgs).latent_dist.mode()
+        image_latents = self.auto_encoder.encode(imgs.to(self.auto_encoder.dtype)).latent_dist.mode()
 
         uncond_image_latents = torch.zeros_like(image_latents)
         image_latents = torch.cat([image_latents, image_latents, uncond_image_latents], dim=0)
