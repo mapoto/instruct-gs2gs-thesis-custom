@@ -87,8 +87,7 @@ from nerfstudio.utils.rich_utils import CONSOLE
 @dataclass
 
 class InstructGS2GSDataManagerConfig(FullImageDatamanagerConfig):
-    '''
-    _target: Type = field(default_factory=lambda: InstructGS2GSDataManagerConfig)
+    _target: Type = field(default_factory=lambda: InstructGS2GSDataManager)
     dataparser: AnnotatedDataParserUnion = NerfstudioDataParserConfig()
     camera_res_scale_factor: float = 1.0
     """The scale factor for scaling spatial data such as images, mask, semantics
@@ -103,46 +102,45 @@ class InstructGS2GSDataManagerConfig(FullImageDatamanagerConfig):
     """Specifies the image indices to use during eval; if None, uses all."""
     cache_images: Literal["no-cache", "cpu", "gpu"] = "cpu"
     """Whether to cache images in memory. If "numpy", caches as numpy arrays, if "torch", caches as torch tensors."""
-    '''
     
 #InstructGS2GSDataManager(VanillaDataManager):
 class InstructGS2GSDataManager(FullImageDatamanager):
     
     config: InstructGS2GSDataManagerConfig
+    
+    def __init__(
+        self,
+        config: FullImageDatamanagerConfig,
+        device: Union[torch.device, str] = "cpu",
+        test_mode: Literal["test", "val", "inference"] = "val",
+        world_size: int = 1,
+        local_rank: int = 0,
+        **kwargs,
+    ):
 
-    '''
-    def setup_train(self):
-        """Sets up the data loaders for training"""
-        assert self.train_dataset is not None
-        CONSOLE.print("Setting up training dataset...")
-        self.train_image_dataloader = CacheDataloader(
-            self.train_dataset,
-            num_images_to_sample_from=self.config.train_num_images_to_sample_from,
-            num_times_to_repeat_images=self.config.train_num_times_to_repeat_images,
-            device=self.device,
-            num_workers=self.world_size * 4,
-            pin_memory=True,
-            collate_fn=self.config.collate_fn,
-        )
-        self.iter_train_image_dataloader = iter(self.train_image_dataloader)
-        self.train_pixel_sampler = self._get_pixel_sampler(self.train_dataset, self.config.train_num_rays_per_batch)
-        self.train_ray_generator = RayGenerator(self.train_dataset.cameras.to(self.device),)
-
-        # pre-fetch the image batch (how images are replaced in dataset)
-        self.image_batch = next(self.iter_train_image_dataloader)
-
-        # keep a copy of the original image batch
-        self.original_image_batch = {}
-        self.original_image_batch['image'] = self.image_batch['image'].clone()
-        self.original_image_batch['image_idx'] = self.image_batch['image_idx'].clone()
-
-    def next_train(self, step: int) -> Tuple[RayBundle, Dict]:
-        """Returns the next batch of data from the train dataloader."""
-        self.train_count += 1
-        assert self.train_pixel_sampler is not None
-        batch = self.train_pixel_sampler.sample(self.image_batch)
-        ray_indices = batch["indices"]
-        ray_bundle = self.train_ray_generator(ray_indices)
+        super().__init__(config, device, test_mode, world_size, local_rank, **kwargs)
+        # cache original training images for ip2p
+        self.original_cached_train = deepcopy(self.cached_train)
+        self.original_cached_eval = deepcopy(self.cached_eval)
         
-        return ray_bundle, batch
-    '''
+        # Some logic to make sure we sample every camera in equal amounts
+        self.editing_unseen_cameras = [i for i in range(len(self.original_cached_train))]
+        
+    def next_edited_image(self, step: int) -> Tuple[Cameras, Dict]:
+        """Returns the next training batch
+
+        Returns a Camera instead of raybundle"""
+        image_idx = self.editing_unseen_cameras.pop(random.randint(0, len(self.editing_unseen_cameras) - 1))
+        # Make sure to re-populate the unseen cameras list if we have exhausted it
+        if len(self.editing_unseen_cameras) == 0:
+            self.editing_unseen_cameras = [i for i in range(len(self.train_dataset))]
+
+        data = deepcopy(self.cached_train[image_idx])
+        data["image"] = data["image"].to(self.device)
+
+        assert len(self.train_dataset.cameras.shape) == 1, "Assumes single batch dimension"
+        camera = self.train_dataset.cameras[image_idx : image_idx + 1].to(self.device)
+        if camera.metadata is None:
+            camera.metadata = {}
+        camera.metadata["cam_idx"] = image_idx
+        return camera, data

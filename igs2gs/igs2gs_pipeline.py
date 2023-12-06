@@ -2,10 +2,13 @@
 Nerfstudio InstructGS2GS Pipeline
 """
 
+import pdb
 import typing
 from dataclasses import dataclass, field
+from itertools import cycle
 from typing import Literal, Optional, Type
 
+import torch
 import torch.distributed as dist
 from torch.cuda.amp.grad_scaler import GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -13,6 +16,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 #eventually add the igs2gs datamanager
 from nerfstudio.data.datamanagers.full_images_datamanager import FullImageDatamanagerConfig,FullImageDatamanager
 from igs2gs.igs2gs import InstructGS2GSModel,InstructGS2GSModelConfig
+from igs2gs.igs2gs_datamanager import InstructGS2GSDataManagerConfig
 
 from nerfstudio.data.datamanagers.base_datamanager import (
     DataManager,
@@ -23,6 +27,7 @@ from nerfstudio.pipelines.base_pipeline import (
     VanillaPipeline,
     VanillaPipelineConfig,
 )
+from igs2gs.ip2p import InstructPix2Pix
 
 @dataclass
 class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
@@ -30,12 +35,31 @@ class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     
     _target: Type = field(default_factory=lambda: InstructGS2GSPipeline)
     """target class to instantiate"""
-    datamanager: DataManagerConfig = FullImageDatamanagerConfig()
+    datamanager: DataManagerConfig = InstructGS2GSDataManagerConfig()
     """specifies the datamanager config"""
     model: ModelConfig = InstructGS2GSModelConfig()
     """specifies the model config"""
+    prompt: str = "don't change the image"
+    """prompt for InstructPix2Pix"""
+    guidance_scale: float = 7.5
+    """(text) guidance scale for InstructPix2Pix"""
+    image_guidance_scale: float = 1.5
+    """image guidance scale for InstructPix2Pix"""
+    edit_rate: int = 10
+    """how many NeRF steps before image edit"""
+    edit_count: int = 1
+    """how many images to edit per NeRF step"""
+    diffusion_steps: int = 20
+    """Number of diffusion steps to take for InstructPix2Pix"""
+    lower_bound: float = 0.02
+    """Lower bound for diffusion timesteps to use for image editing"""
+    upper_bound: float = 0.98
+    """Upper bound for diffusion timesteps to use for image editing"""
+    ip2p_device: Optional[str] = None
+    """Second device to place InstructPix2Pix on. If None, will use the same device as the pipeline"""
+    ip2p_use_full_precision: bool = True
+    """Whether to use full precision for InstructPix2Pix"""
     
-
 
 class InstructGS2GSPipeline(VanillaPipeline):
     """InstructGS2GS Pipeline
@@ -53,28 +77,91 @@ class InstructGS2GSPipeline(VanillaPipeline):
         local_rank: int = 0,
         grad_scaler: Optional[GradScaler] = None,
     ):
-        super(VanillaPipeline, self).__init__()
-        self.config = config
-        self.test_mode = test_mode
-        self.datamanager: DataManager = config.datamanager.setup(
-            device=device, test_mode=test_mode, world_size=world_size, local_rank=local_rank
+        super().__init__(config, device, test_mode, world_size, local_rank)
+        
+        # select device for InstructPix2Pix
+        self.ip2p_device = (
+            torch.device(device)
+            if self.config.ip2p_device is None
+            else torch.device(self.config.ip2p_device)
         )
-        self.datamanager.to(device)
 
-        assert self.datamanager.train_dataset is not None, "Missing input dataset"
-        self._model = config.model.setup(
-            scene_box=self.datamanager.train_dataset.scene_box,
-            num_train_data=len(self.datamanager.train_dataset),
-            metadata=self.datamanager.train_dataset.metadata,
-            device=device,
-            grad_scaler=grad_scaler,
+        self.ip2p = InstructPix2Pix(self.ip2p_device, ip2p_use_full_precision=self.config.ip2p_use_full_precision)
+
+        # load base text embedding using classifier free guidance
+        self.text_embedding = self.ip2p.pipe._encode_prompt(
+            self.config.prompt, device=self.ip2p_device, num_images_per_prompt=1, do_classifier_free_guidance=True, negative_prompt=""
         )
-        self.model.to(device)
+            
+    
+    def get_train_loss_dict(self, step: int):
+        """This function gets your training loss dict and performs image editing.
+        Args:
+            step: current iteration step to update sampler if using DDP (distributed)
+        """
 
-        self.world_size = world_size
-        if world_size > 1:
-            self._model = typing.cast(
-                InstructGS2GSModel, DDP(self._model, device_ids=[local_rank], find_unused_parameters=True)
-            )
-            dist.barrier(device_ids=[local_rank])
+        camera, data = self.datamanager.next_train(step)
+
+        model_outputs = self.model(camera)
+        metrics_dict = self.model.get_metrics_dict(model_outputs, data)
+
+        # edit an image every ``edit_rate`` steps
+        if (step % self.config.edit_rate == 0):
+
+            # edit ``edit_count`` images in a row
+            for i in range(self.config.edit_count):
+                
+                edit_camera, edit_data = self.datamanager.next_edited_image(step)
+                idx = edit_data["image_idx"].item()
+
+                # # iterate through "spot in dataset"
+                # current_spot = next(self.train_indices_order)
+                
+                # # get original image from dataset
+                # original_image = self.datamanager.original_image_batch["image"][current_spot].to(self.device)
+                # # generate current index in datamanger
+                # current_index = self.datamanager.image_batch["image_idx"][current_spot]
+
+                # # get current camera, include camera transforms from original optimizer
+                # camera_transforms = self.model.camera_optimizer(current_index.unsqueeze(dim=0))
+                # current_camera = self.datamanager.train_dataparser_outputs.cameras[current_index].to(self.device)
+                # current_ray_bundle = current_camera.generate_rays(torch.tensor(list(range(1))).unsqueeze(-1), camera_opt_to_camera=camera_transforms)
+
+                # # get current render of nerf
+                original_image = original_image.unsqueeze(dim=0).permute(0, 3, 1, 2)
+                camera_outputs = self.model.get_outputs_for_camera_ray_bundle(edit_camera)
+                rendered_image = camera_outputs["rgb"].unsqueeze(dim=0).permute(0, 3, 1, 2)
+
+                # # delete to free up memory
+                # del camera_outputs
+                # del current_camera
+                # del current_ray_bundle
+                # del camera_transforms
+                # torch.cuda.empty_cache()
+
+                edited_image = self.ip2p.edit_image(
+                            self.text_embedding.to(self.ip2p_device),
+                            rendered_image.to(self.ip2p_device),
+                            original_image.to(self.ip2p_device),
+                            guidance_scale=self.config.guidance_scale,
+                            image_guidance_scale=self.config.image_guidance_scale,
+                            diffusion_steps=self.config.diffusion_steps,
+                            lower_bound=self.config.lower_bound,
+                            upper_bound=self.config.upper_bound,
+                        )
+
+                # resize to original image size (often not necessary)
+                if (edited_image.size() != rendered_image.size()):
+                    edited_image = torch.nn.functional.interpolate(edited_image, size=rendered_image.size()[2:], mode='bilinear')
+
+                # write edited image to dataloader
+                self.cached_train[idx] = edited_image.squeeze().permute(1,2,0)
+
+        loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
+
+        return model_outputs, loss_dict, metrics_dict
+
+    def forward(self):
+        """Not implemented since we only want the parameter saving of the nn module, but not forward()"""
+        raise NotImplementedError
     
