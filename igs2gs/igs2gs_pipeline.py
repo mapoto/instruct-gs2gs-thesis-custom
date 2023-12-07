@@ -2,6 +2,7 @@
 Nerfstudio InstructGS2GS Pipeline
 """
 
+import matplotlib.pyplot as plt
 import pdb
 import typing
 from dataclasses import dataclass, field
@@ -111,15 +112,22 @@ class InstructGS2GSPipeline(VanillaPipeline):
             # edit ``edit_count`` images in a row
             for i in range(self.config.edit_count):
                 
-                edit_camera, edit_data = self.datamanager.next_edited_image(step)
-                idx = edit_camera.metadata["cam_idx"]
+                # edit_camera, edit_data = self.datamanager.next_edited_image(step)
+                # idx = edit_camera.metadata["cam_idx"]
+                
+                idx = camera.metadata["cam_idx"]
                 
                 original_image = self.datamanager.original_cached_train[idx]["image"]
 
                 # # get current render of nerf
                 original_image = original_image.unsqueeze(dim=0).permute(0, 3, 1, 2)
-                camera_outputs = self.model.get_outputs(edit_camera) # this line causes a bug later, need to debug
-                rendered_image = camera_outputs["rgb"].unsqueeze(dim=0).permute(0, 3, 1, 2)
+                # camera_outputs = self.model.get_outputs(edit_camera) # this line causes a bug later, need to debug
+                # camera_outputs = self.model.get_outputs(edit_camera)
+                rendered_image = model_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
+                
+                # save images
+                plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+                plt.imsave("original_image.png", original_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
                 
                 edited_image = self.ip2p.edit_image(
                             self.text_embedding.to(self.ip2p_device),
@@ -137,6 +145,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
                     edited_image = torch.nn.functional.interpolate(edited_image, size=rendered_image.size()[2:], mode='bilinear')
 
                 # write edited image to dataloader
+                plt.imsave("edited_image.png", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
                 self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
 
         loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
