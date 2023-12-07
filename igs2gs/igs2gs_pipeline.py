@@ -145,6 +145,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
                     edited_image = torch.nn.functional.interpolate(edited_image, size=rendered_image.size()[2:], mode='bilinear')
 
                 # write edited image to dataloader
+                edited_image = edited_image.to(torch.float32)
                 plt.imsave("edited_image.png", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
                 self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
 
