@@ -126,21 +126,16 @@ class InstructGS2GSDataManager(FullImageDatamanager):
         # Some logic to make sure we sample every camera in equal amounts
         self.editing_unseen_cameras = [i for i in range(len(self.train_dataset))]
         
-    def next_edited_image(self, step: int) -> Tuple[Cameras, Dict]:
+    def next_train_idx(self, idx: int) -> Tuple[Cameras, Dict]:
         """Returns the next training batch
 
         Returns a Camera instead of raybundle"""
-        image_idx = self.editing_unseen_cameras.pop(random.randint(0, len(self.editing_unseen_cameras) - 1))
-        # Make sure to re-populate the unseen cameras list if we have exhausted it
-        if len(self.editing_unseen_cameras) == 0:
-            self.editing_unseen_cameras = [i for i in range(len(self.train_dataset))]
-
-        data = deepcopy(self.cached_train[image_idx])
+        data = deepcopy(self.cached_train[idx])
         data["image"] = data["image"].to(self.device)
 
         assert len(self.train_dataset.cameras.shape) == 1, "Assumes single batch dimension"
-        camera = self.train_dataset.cameras[image_idx : image_idx + 1].to(self.device)
+        camera = self.train_dataset.cameras[idx : idx + 1].to(self.device)
         if camera.metadata is None:
             camera.metadata = {}
-        camera.metadata["cam_idx"] = image_idx
+        camera.metadata["cam_idx"] = idx
         return camera, data

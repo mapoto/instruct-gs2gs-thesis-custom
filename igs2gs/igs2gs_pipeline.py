@@ -100,58 +100,84 @@ class InstructGS2GSPipeline(VanillaPipeline):
         Args:
             step: current iteration step to update sampler if using DDP (distributed)
         """
-
+        
+        if (step % 1000):
+            self.edit_entire_dataset()
+        
         camera, data = self.datamanager.next_train(step)
-
         model_outputs = self.model(camera)
         metrics_dict = self.model.get_metrics_dict(model_outputs, data)
-
-        # edit an image every ``edit_rate`` steps
-        if (step % self.config.edit_rate == 0):
-
-            # edit ``edit_count`` images in a row
-            for i in range(self.config.edit_count):
-                
-                # edit_camera, edit_data = self.datamanager.next_edited_image(step)
-                # idx = edit_camera.metadata["cam_idx"]
-                
-                idx = camera.metadata["cam_idx"]
-                
-                original_image = self.datamanager.original_cached_train[idx]["image"]
-
-                # # get current render of nerf
-                original_image = original_image.unsqueeze(dim=0).permute(0, 3, 1, 2)
-                # camera_outputs = self.model.get_outputs(edit_camera) # this line causes a bug later, need to debug
-                # camera_outputs = self.model.get_outputs(edit_camera)
-                rendered_image = model_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
-                
-                # save images
-                plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
-                plt.imsave("original_image.png", original_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
-                
-                edited_image = self.ip2p.edit_image(
-                            self.text_embedding.to(self.ip2p_device),
-                            rendered_image.to(self.ip2p_device),
-                            original_image.to(self.ip2p_device),
-                            guidance_scale=self.config.guidance_scale,
-                            image_guidance_scale=self.config.image_guidance_scale,
-                            diffusion_steps=self.config.diffusion_steps,
-                            lower_bound=self.config.lower_bound,
-                            upper_bound=self.config.upper_bound,
-                        )
-
-                # resize to original image size (often not necessary)
-                if (edited_image.size() != rendered_image.size()):
-                    edited_image = torch.nn.functional.interpolate(edited_image, size=rendered_image.size()[2:], mode='bilinear')
-
-                # write edited image to dataloader
-                edited_image = edited_image.to(torch.float32)
-                plt.imsave("edited_image.png", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
-                self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
-
+        
+        # original_image = self.datamanager.original_cached_train[idx]["image"].unsqueeze(dim=0).permute(0, 3, 1, 2)
+        # rendered_image = model_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
+        
+        # # save images
+        # plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+        # plt.imsave("original_image.png", original_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+        
+        # edited_image = self.ip2p.edit_image(
+        #             self.text_embedding.to(self.ip2p_device),
+        #             rendered_image.to(self.ip2p_device),
+        #             original_image.to(self.ip2p_device),
+        #             guidance_scale=self.config.guidance_scale,
+        #             image_guidance_scale=self.config.image_guidance_scale,
+        #             diffusion_steps=self.config.diffusion_steps,
+        #             lower_bound=self.config.lower_bound,
+        #             upper_bound=self.config.upper_bound,
+        #         )
+        
+        # edited_image = edited_image.to(original_image.dtype)
+        # # resize to original image size (often not necessary)
+        # if (edited_image.size() != rendered_image.size()):
+        #     edited_image = torch.nn.functional.interpolate(edited_image, size=rendered_image.size()[2:], mode='bilinear')
+            
+        # data["image"] = edited_image.squeeze().permute(1,2,0)
+        # self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
+        
+        # plt.imsave("edited_image.png", data["image"].detach().cpu().numpy())
+        
+        
         loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
-
+        
         return model_outputs, loss_dict, metrics_dict
+    
+    def edit_entire_dataset(self):
+        # edit an image every ``edit_rate`` steps
+        for idx, _ in enumerate(self.datamanager.cached_train):
+            
+            edit_camera, edit_data = self.datamanager.next_train_idx(idx)
+            # idx = edit_camera.metadata["cam_idx"]
+            
+            original_image = edit_data["image"]
+
+            # get current render of nerf
+            original_image = original_image.unsqueeze(dim=0).permute(0, 3, 1, 2)
+            # camera_outputs = self.model.get_outputs_for_camera(edit_camera) # this line causes a bug later, need to debug
+            rendered_image = original_image#camera_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
+            
+            # save images
+            plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+            plt.imsave("original_image.png", original_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+            
+            edited_image = self.ip2p.edit_image(
+                        self.text_embedding.to(self.ip2p_device),
+                        rendered_image.to(self.ip2p_device),
+                        original_image.to(self.ip2p_device),
+                        guidance_scale=self.config.guidance_scale,
+                        image_guidance_scale=self.config.image_guidance_scale,
+                        diffusion_steps=self.config.diffusion_steps,
+                        lower_bound=self.config.lower_bound,
+                        upper_bound=self.config.upper_bound,
+                    )
+
+            # resize to original image size (often not necessary)
+            if (edited_image.size() != rendered_image.size()):
+                edited_image = torch.nn.functional.interpolate(edited_image, size=rendered_image.size()[2:], mode='bilinear')
+
+            # write edited image to dataloader
+            edited_image = edited_image.to(original_image.dtype)
+            plt.imsave("edited_image.png", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+            self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
 
     def forward(self):
         """Not implemented since we only want the parameter saving of the nn module, but not forward()"""

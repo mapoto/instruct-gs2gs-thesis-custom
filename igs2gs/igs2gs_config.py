@@ -80,11 +80,11 @@ igs2gs_method = MethodSpecification(
             },
             "camera_opt": {
                 "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=5e-5, max_steps=30000),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=5e-5, max_steps=5000),
             },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
-        vis="viewer",
+        vis="viewer_beta",
     ),
     description="Instruct-GS2GS primary method: uses LPIPS, IP2P at full precision",
 
@@ -136,7 +136,7 @@ igs2gs_method_small = MethodSpecification(
             },
             "camera_opt": {
                 "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=5e-5, max_steps=30000),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=5e-5, max_steps=5000),
             },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
@@ -191,7 +191,7 @@ igs2gs_method_tiny = MethodSpecification(
             },
             "camera_opt": {
                 "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=5e-5, max_steps=30000),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=5e-5, max_steps=5000),
             },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
