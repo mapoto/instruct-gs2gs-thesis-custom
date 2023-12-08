@@ -101,7 +101,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
             step: current iteration step to update sampler if using DDP (distributed)
         """
         
-        if (step % 1000):
+        if (step % 1000) == 0:
             self.edit_entire_dataset()
         
         camera, data = self.datamanager.next_train(step)
@@ -136,7 +136,8 @@ class InstructGS2GSPipeline(VanillaPipeline):
         
         # plt.imsave("edited_image.png", data["image"].detach().cpu().numpy())
         
-        
+        rendered_image = model_outputs["rgb"].unsqueeze(dim=0).permute(0, 3, 1, 2)
+        plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
         loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
         
         return model_outputs, loss_dict, metrics_dict
@@ -156,7 +157,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
             rendered_image = original_image#camera_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
             
             # save images
-            plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+            # plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
             plt.imsave("original_image.png", original_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
             
             edited_image = self.ip2p.edit_image(
