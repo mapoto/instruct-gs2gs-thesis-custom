@@ -52,7 +52,7 @@ class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     """how many images to edit per NeRF step"""
     diffusion_steps: int = 20
     """Number of diffusion steps to take for InstructPix2Pix"""
-    lower_bound: float = 0.02
+    lower_bound: float = 0.7
     """Lower bound for diffusion timesteps to use for image editing"""
     upper_bound: float = 0.98
     """Upper bound for diffusion timesteps to use for image editing"""
@@ -212,7 +212,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
             
             # save images
             #plt.imsave("test_rendered_image"+str(idx)+ ".png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
-            plt.imsave("original_image.png", original_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+            #plt.imsave("original_image.png", original_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
             
             edited_image = self.ip2p.edit_image(
                         self.text_embedding.to(self.ip2p_device),
@@ -231,7 +231,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
 
             # write edited image to dataloader
             edited_image = edited_image.to(original_image.dtype)
-            plt.imsave("frederik_new_1_suit/edited_image_"+ str(idx)+".jpg", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+            #plt.imsave("frederik_new_1_suit/edited_image_"+ str(idx)+".jpg", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
             self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
 
     def forward(self):
