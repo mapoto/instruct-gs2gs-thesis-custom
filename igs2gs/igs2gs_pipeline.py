@@ -42,7 +42,7 @@ class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     """specifies the model config"""
     prompt: str = "don't change the image"
     """prompt for InstructPix2Pix"""
-    guidance_scale: float = 13.5 #7.5
+    guidance_scale: float = 12.5 #7.5
     """(text) guidance scale for InstructPix2Pix"""
     image_guidance_scale: float = 1.5
     """image guidance scale for InstructPix2Pix"""
