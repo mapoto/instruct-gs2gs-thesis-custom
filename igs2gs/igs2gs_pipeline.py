@@ -104,7 +104,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
             step: current iteration step to update sampler if using DDP (distributed)
         """
       
-        if ((step-1) % 1000) == 0:
+        if ((step-1) % 2500) == 0:
             #self.edit_entire_dataset()
             #self.edit_full_dataset_incrementally()
             self.makeSquentialEdits = True
@@ -149,7 +149,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
             edited_image = edited_image.to(original_image.dtype)
             #plt.imsave("testing_seq_edits/edited_image_"+ str(idx)+".jpg", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
             self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
-    
+            data["image"] = edited_image.squeeze().permute(1,2,0)
 
             #increment curr edit idx
             self.curr_edit_idx += 1
