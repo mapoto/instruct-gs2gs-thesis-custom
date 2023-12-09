@@ -2,6 +2,7 @@
 Nerfstudio InstructGS2GS Pipeline
 """
 
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 import pdb
 import typing
@@ -42,9 +43,9 @@ class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     """specifies the model config"""
     prompt: str = "don't change the image"
     """prompt for InstructPix2Pix"""
-    guidance_scale: float = 7.5
+    guidance_scale: float = 12.5
     """(text) guidance scale for InstructPix2Pix"""
-    image_guidance_scale: float = 1.5
+    image_guidance_scale: float = 1.2
     """image guidance scale for InstructPix2Pix"""
     edit_rate: int = 10
     """how many NeRF steps before image edit"""
@@ -52,7 +53,7 @@ class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     """how many images to edit per NeRF step"""
     diffusion_steps: int = 20
     """Number of diffusion steps to take for InstructPix2Pix"""
-    lower_bound: float = 0.02
+    lower_bound: float = 0.70
     """Lower bound for diffusion timesteps to use for image editing"""
     upper_bound: float = 0.98
     """Upper bound for diffusion timesteps to use for image editing"""
@@ -101,7 +102,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
             step: current iteration step to update sampler if using DDP (distributed)
         """
         
-        if (step % 1000) == 0:
+        if (step % 2500) == 0:
             self.edit_entire_dataset()
         
         camera, data = self.datamanager.next_train(step)
@@ -137,14 +138,16 @@ class InstructGS2GSPipeline(VanillaPipeline):
         # plt.imsave("edited_image.png", data["image"].detach().cpu().numpy())
         
         rendered_image = model_outputs["rgb"].unsqueeze(dim=0).permute(0, 3, 1, 2)
-        plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+        gt_img = data["image"].unsqueeze(dim=0).permute(0, 3, 1, 2)
+        plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy().clip(0,1))
+        plt.imsave("gt_img.png", gt_img.squeeze().permute(1, 2, 0).detach().cpu().numpy().clip(0,1))
         loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
         
         return model_outputs, loss_dict, metrics_dict
     
     def edit_entire_dataset(self):
         # edit an image every ``edit_rate`` steps
-        for idx, _ in enumerate(self.datamanager.cached_train):
+        for idx, _ in tqdm(enumerate(self.datamanager.cached_train)):
             
             edit_camera, edit_data = self.datamanager.next_train_idx(idx)
             # idx = edit_camera.metadata["cam_idx"]
@@ -177,7 +180,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
 
             # write edited image to dataloader
             edited_image = edited_image.to(original_image.dtype)
-            plt.imsave("edited_image.png", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+            plt.imsave("edited_image.png", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy().clip(0,1))
             self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
 
     def forward(self):
