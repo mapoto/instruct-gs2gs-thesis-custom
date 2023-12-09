@@ -42,7 +42,7 @@ class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     """specifies the model config"""
     prompt: str = "don't change the image"
     """prompt for InstructPix2Pix"""
-    guidance_scale: float = 7.5
+    guidance_scale: float = 13.5 #7.5
     """(text) guidance scale for InstructPix2Pix"""
     image_guidance_scale: float = 1.5
     """image guidance scale for InstructPix2Pix"""
@@ -93,6 +93,9 @@ class InstructGS2GSPipeline(VanillaPipeline):
         self.text_embedding = self.ip2p.pipe._encode_prompt(
             self.config.prompt, device=self.ip2p_device, num_images_per_prompt=1, do_classifier_free_guidance=True, negative_prompt=""
         )
+
+        self.curr_edit_idx = 0
+        self.makeSquentialEdits = False
             
     
     def get_train_loss_dict(self, step: int):
@@ -100,13 +103,62 @@ class InstructGS2GSPipeline(VanillaPipeline):
         Args:
             step: current iteration step to update sampler if using DDP (distributed)
         """
-        
-        if (step % 1000) == 0:
-            self.edit_entire_dataset()
-        
-        camera, data = self.datamanager.next_train(step)
-        model_outputs = self.model(camera)
-        metrics_dict = self.model.get_metrics_dict(model_outputs, data)
+      
+        if ((step-1) % 1000) == 0:
+            #self.edit_entire_dataset()
+            #self.edit_full_dataset_incrementally()
+            self.makeSquentialEdits = True
+
+        if (not self.makeSquentialEdits):
+            camera, data = self.datamanager.next_train(step)
+            model_outputs = self.model(camera)
+            metrics_dict = self.model.get_metrics_dict(model_outputs, data)
+        else:
+            #camera, data = self.datamanager.next_train(step)
+            #model_outputs = self.model(camera)
+            #metrics_dict = self.model.get_metrics_dict(model_outputs, data)
+
+            #get index
+            idx = self.curr_edit_idx
+            camera, data = self.datamanager.next_train_idx(idx)
+            model_outputs = self.model(camera)
+            metrics_dict = self.model.get_metrics_dict(model_outputs, data)
+
+            #original_image = edit_data["image"]
+            original_image = self.datamanager.original_cached_train[idx]["image"].unsqueeze(dim=0).permute(0, 3, 1, 2)
+            rendered_image = model_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
+            #plt.imsave("testing_seq_edits/original_image_"+str(idx)+".jpg", original_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+            #plt.imsave("testing_seq_edits/rendered_image_"+str(idx)+".jpg", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+
+            edited_image = self.ip2p.edit_image(
+                        self.text_embedding.to(self.ip2p_device),
+                        rendered_image.to(self.ip2p_device),
+                        original_image.to(self.ip2p_device),
+                        guidance_scale=self.config.guidance_scale,
+                        image_guidance_scale=self.config.image_guidance_scale,
+                        diffusion_steps=self.config.diffusion_steps,
+                        lower_bound=self.config.lower_bound,
+                        upper_bound=self.config.upper_bound,
+                    )
+
+            # resize to original image size (often not necessary)
+            if (edited_image.size() != rendered_image.size()):
+                edited_image = torch.nn.functional.interpolate(edited_image, size=rendered_image.size()[2:], mode='bilinear')
+
+            # write edited image to dataloader
+            edited_image = edited_image.to(original_image.dtype)
+            #plt.imsave("testing_seq_edits/edited_image_"+ str(idx)+".jpg", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+            self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
+    
+
+            #increment curr edit idx
+            self.curr_edit_idx += 1
+            if (self.curr_edit_idx >= len(self.datamanager.cached_train)):
+                self.curr_edit_idx = 0
+                self.makeSquentialEdits = False
+            
+    
+
         
         # original_image = self.datamanager.original_cached_train[idx]["image"].unsqueeze(dim=0).permute(0, 3, 1, 2)
         # rendered_image = model_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
@@ -136,8 +188,9 @@ class InstructGS2GSPipeline(VanillaPipeline):
         
         # plt.imsave("edited_image.png", data["image"].detach().cpu().numpy())
         
-        rendered_image = model_outputs["rgb"].unsqueeze(dim=0).permute(0, 3, 1, 2)
-        plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+        #rendered_image = model_outputs["rgb"].unsqueeze(dim=0).permute(0, 3, 1, 2)
+        #plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+
         loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
         
         return model_outputs, loss_dict, metrics_dict
@@ -155,9 +208,10 @@ class InstructGS2GSPipeline(VanillaPipeline):
             original_image = original_image.unsqueeze(dim=0).permute(0, 3, 1, 2)
             # camera_outputs = self.model.get_outputs_for_camera(edit_camera) # this line causes a bug later, need to debug
             rendered_image = original_image#camera_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
+            #rendered_image = camera_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
             
             # save images
-            # plt.imsave("rendered_image.png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+            #plt.imsave("test_rendered_image"+str(idx)+ ".png", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
             plt.imsave("original_image.png", original_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
             
             edited_image = self.ip2p.edit_image(
@@ -177,7 +231,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
 
             # write edited image to dataloader
             edited_image = edited_image.to(original_image.dtype)
-            plt.imsave("edited_image.png", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
+            plt.imsave("frederik_new_1_suit/edited_image_"+ str(idx)+".jpg", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
             self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
 
     def forward(self):
