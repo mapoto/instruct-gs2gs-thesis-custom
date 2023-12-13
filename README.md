@@ -1,6 +1,5 @@
-# Instruct-NeRF2NeRF: Editing 3D Scenes with Instructions
+# Instruct-GS2GS: Editing 3D Scenes with Instructions
 
-This is the official implementation of [Instruct-NeRF2NeRF](https://instruct-nerf2nerf.github.io/).
 
 ![teaser](imgs/in2n_teaser.png)
 
@@ -8,62 +7,62 @@ This is the official implementation of [Instruct-NeRF2NeRF](https://instruct-ner
 
 ## 1. Install Nerfstudio dependencies
 
-Instruct-NeRF2NeRF is build on Nerfstudio and therefore has the same dependency reqirements. Specfically [PyTorch](https://pytorch.org/) and [tinycudann](https://github.com/NVlabs/tiny-cuda-nn) are required.
+Instruct-GS2GS is build on Nerfstudio and therefore has the same dependency reqirements. Specfically [PyTorch](https://pytorch.org/) and [tinycudann](https://github.com/NVlabs/tiny-cuda-nn) are required.
 
-Follow the instructions [at this link](https://docs.nerf.studio/en/latest/quickstart/installation.html) to create the environment and install dependencies. Only follow the commands up to tinycudann. After the dependencies have been installed, return here.
+Follow the instructions [at this link](https://docs.nerf.studio/quickstart/installation.html) to create the environment and install dependencies. Only follow the commands up to tinycudann. After the dependencies have been installed, return here.
 
-## 2. Installing Instruct-NeRF2NeRF
+## 2. Installing Instruct-GS2GS
 
-Once you have finished installing dependencies, you can install Instruct-NeRF2NeRF using the following command:
+Once you have finished installing dependencies, you can install Instruct-GS2GS using the following command:
 ```bash
-pip install git+https://github.com/ayaanzhaque/instruct-nerf2nerf
+pip install git+https://github.com/cvachha/instruct-gs2gs
 ```
 
 _Optional_: If you would like to work with the code directly, clone then install the repo:
 ```bash
-git clone https://github.com/ayaanzhaque/instruct-nerf2nerf.git
-cd instruct-nerf2nerf
+git clone https://github.com/cvachha/instruct-gs2gs.git
+cd instruct-gs2gs
 pip install --upgrade pip setuptools
 pip install -e .
 ```
 
 ## 3. Checking the install
 
-The following command should include `in2n` as one of the options:
+The following command should include `igs2gs` as one of the options:
 ```bash
 ns-train -h
 ```
 
-# Using Instruct-NeRF2NeRF
+# Using Instruct-GS2GS
 
 ![teaser](imgs/in2n_pipeline.png)
 
-To edit a NeRF, you must first train a regular `nerfacto` scene using your data. To process your custom data, please refer to [this](https://docs.nerf.studio/en/latest/quickstart/custom_dataset.html) documentation.
+To edit a GS, you must first train a regular `gaussian-splatting` scene using your data. To process your custom data, please refer to [this](https://docs.nerf.studio/quickstart/custom_dataset.html) documentation.
 
-Once you have your custom data, you can train your initial NeRF with the following command:
+Once you have your custom data, you can train your initial GS with the following command:
 
 ```bash
-ns-train nerfacto --data {PROCESSED_DATA_DIR}
+ns-train gaussian-splatting --data {PROCESSED_DATA_DIR}
 ```
 
-For more details on training a NeRF, see [Nerfstudio documentation](https://docs.nerf.studio/en/latest/quickstart/first_nerf.html).
+For more details on training a GS, see [Nerfstudio documentation](https://docs.nerf.studio/quickstart/first_nerf.html).
 
 Once you have fully trained your scene, the checkpoints will be saved to the `outputs` directory. Copy the path to the `nerfstudio_models` folder.
 
-To start training for editing the NeRF, run the following command:
+To start training for editing the GS, run the following command:
 
 ```bash
-ns-train in2n --data {PROCESSED_DATA_DIR} --load-dir {outputs/.../nerfstudio_models} --pipeline.prompt {"prompt"} --pipeline.guidance-scale 7.5 --pipeline.image-guidance-scale 1.5
+ns-train igs2gs --data {PROCESSED_DATA_DIR} --load-dir {outputs/.../nerfstudio_models} --pipeline.prompt {"prompt"} --pipeline.guidance-scale 7.5 --pipeline.image-guidance-scale 1.5
 ```
 
-The `{PROCESSED_DATA_DIR}` must be the same path as used in training the original NeRF. Using the CLI commands, you can choose the prompt and the guidance scales used for InstructPix2Pix.
+The `{PROCESSED_DATA_DIR}` must be the same path as used in training the original GS. Using the CLI commands, you can choose the prompt and the guidance scales used for InstructPix2Pix.
 
-After the NeRF is trained, you can render the NeRF using the standard Nerfstudio workflow, found [here](https://docs.nerf.studio/en/latest/quickstart/viewer_quickstart.html).
+After the GS is trained, you can render the GS using the standard Nerfstudio workflow, found [here](https://docs.nerf.studio/quickstart/viewer_quickstart.html).
 
 ## Training Notes
 
 ***Important***
-Please note that training the NeRF on images with resolution larger than 512 will likely cause InstructPix2Pix to throw OOM errors. Moreover, it seems InstructPix2Pix performs significantly worse on images at higher resolution. We suggest training with a resolution that is around 512 (max dimension), so add the following tag to the end of both your `nerfacto` and `in2n` training command: `nerfstudio-data --downscale-factor {2,4,6,8}` to the end of your `ns-train` commands. Alternatively, you can downscale your dataset yourself and update your `transforms.json` file (scale down w, h, fl_x, fl_y, cx, cy), or you can use a smaller image scale provided by Nerfstudio.
+Please note that training the GS on images with resolution larger than 512 will likely cause InstructPix2Pix to throw OOM errors. Moreover, it seems InstructPix2Pix performs significantly worse on images at higher resolution. We suggest training with a resolution that is around 512 (max dimension), so add the following tag to the end of both your `gaussian-splatting` and `igs2gs` training command: `nerfstudio-data --downscale-factor {2,4,6,8}` to the end of your `ns-train` commands. Alternatively, you can downscale your dataset yourself and update your `transforms.json` file (scale down w, h, fl_x, fl_y, cx, cy), or you can use a smaller image scale provided by Nerfstudio.
 
 We recommend capturing data using images from Polycam, as smaller datasets work better and faster with our method.
 
@@ -73,43 +72,29 @@ Our method uses ~16K rays and LPIPS, but not all GPUs have enough memory to run 
 
 | Method | Description | Memory | Quality |
 | ---------------------------------------------------------------------------------------------------- | -------------- | ----------------------------------------------------------------- | ----------------------- |
-| `in2n` | Full model, used in paper | ~15GB | Best |
-| `in2n-small` | Half precision model | ~12GB | Good |
-| `in2n-tiny` | Half precision with no LPIPS | ~10GB | Ok |
+| `igs2gs` | Full model, used in paper | ~15GB | Best |
 
-Currently, we set the max number of iterations for `in2n` training to be 15k iteratios. Most often, the edit will look good after ~10k iterations. If you would like to train for longer, just reload your last `in2n` checkpoint and continue training, or change `--max-num-iterations 30000`.
+Currently, we set the max number of iterations for `igs2gs` training to be 15k iteratios. Most often, the edit will look good after ~10k iterations. If you would like to train for longer, just reload your last `igs2gs` checkpoint and continue training, or change `--max-num-iterations 30000`.
 
 ## Tips
 
 If your edit isn't working as you desire, it is likely because InstructPix2Pix struggles with your images and prompt. We recommend taking one of your training views and trying to edit it in 2D first with InstructPix2Pix, which can be done at [this](https://huggingface.co/spaces/timbrooks/instruct-pix2pix) HuggingFace space. More tips on getting a good edit can be found [here](https://github.com/timothybrooks/instruct-pix2pix#tips).
 
-# Extending Instruct-NeRF2NeRF
+# Extending Instruct-GS2GS
 
 ### Issues
 Please open Github issues for any installation/usage problems you run into. We've tried to support as broad a range of GPUs as possible, but it might be necessary to provide even more low-footprint versions. Please contribute with any changes to improve memory usage!
 
 ### Code structure
-To build off Instruct-NeRF2NeRF, we provide explanations of the core code components.
+To build off Instruct-GS2GS, we provide explanations of the core code components.
 
-`in2n_datamanager.py`: This file is almost identical to the `base_datamanager.py` in Nerfstudio. The main difference is that the entire dataset tensor is pre-computed in the `setup_train` method as opposed to being sampled in the `next_train` method each time.
+`igs2gs_datamanager.py`: This file is almost identical to the `base_datamanager.py` in Nerfstudio. The main difference is that the entire dataset tensor is pre-computed in the `setup_train` method as opposed to being sampled in the `next_train` method each time.
 
-`in2n_pipeline.py`: This file builds on the pipeline module in Nerfstudio. The `get_train_loss_dict` method samples images and places edited images back into the dataset.
+`igs2gs_pipeline.py`: This file builds on the pipeline module in Nerfstudio. The `get_train_loss_dict` method samples images and places edited images back into the dataset.
 
 `ip2p.py`: This file houses the InstructPix2Pix model (using the `diffusers` implementation). The `edit_image` method is where an image is denoised using the diffusion model, and a variety of helper methods are contained in this file as well.
 
-`in2n.py`: We overwrite the `get_loss_dict` method to use LPIPs loss and L1Loss.
+`igs2gs.py`: We overwrite the `get_loss_dict` method to use LPIPs loss and L1Loss.
 
 # Citation
-
-You can find our paper on [arXiv](https://arxiv.org/abs/2303.12789).
-
-If you find this code or find the paper useful for your research, please consider citing:
-
-```
-@inproceedings{instructnerf2023,
-    author = {Haque, Ayaan and Tancik, Matthew and Efros, Alexei and Holynski, Aleksander and Kanazawa, Angjoo},
-    title = {Instruct-NeRF2NeRF: Editing 3D Scenes with Instructions},
-    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision},
-    year = {2023},
-}
-```
+Cyrus Vachha and Ayaan Haque
