@@ -1,7 +1,7 @@
 # Instruct-GS2GS: Editing 3D Scenes with Instructions
 
 
-![teaser](imgs/in2n_teaser.png)
+![teaser](imgs/igs2gs_teaser.png)
 
 # Installation
 
@@ -35,7 +35,7 @@ ns-train -h
 
 # Using Instruct-GS2GS
 
-![teaser](imgs/in2n_pipeline.png)
+![teaser](imgs/igs2gs_pipeline.png)
 
 To edit a GS, you must first train a regular `gaussian-splatting` scene using your data. To process your custom data, please refer to [this](https://docs.nerf.studio/quickstart/custom_dataset.html) documentation.
 
@@ -47,7 +47,7 @@ ns-train gaussian-splatting --data {PROCESSED_DATA_DIR}
 
 For more details on training a GS, see [Nerfstudio documentation](https://docs.nerf.studio/quickstart/first_nerf.html).
 
-Once you have fully trained your scene, the checkpoints will be saved to the `outputs` directory. Copy the path to the `nerfstudio_models` folder.
+Once you have trained your scene for 20k iterations, the checkpoints will be saved to the `outputs` directory. Copy the path to the `nerfstudio_models` folder. (Note: We noticed that training for 20k iterations rather than 30k seemed to run more reliably)
 
 To start training for editing the GS, run the following command:
 
