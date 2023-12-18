@@ -40,5 +40,3 @@ include = ["igs2gs"]
 
 [project.entry-points.'nerfstudio.method_configs']
 igs2gs = 'igs2gs.igs2gs_config:igs2gs_method'
-igs2gs_small = 'igs2gs.igs2gs_config:igs2gs_method_small'
-igs2gs_tiny = 'igs2gs.igs2gs_config:igs2gs_method_tiny'
