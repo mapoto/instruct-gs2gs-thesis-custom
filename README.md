@@ -13,7 +13,7 @@ Follow the instructions [at this link](https://docs.nerf.studio/quickstart/insta
 
 ## 2. Installing Instruct-GS2GS
 
-Once you have finished installing dependencies, you can install Instruct-GS2GS using the following command:
+Once you have finished installing dependencies, including those for gsplat, you can install Instruct-GS2GS using the following command:
 ```bash
 pip install git+https://github.com/cvachha/instruct-gs2gs
 ```
@@ -52,7 +52,7 @@ Once you have trained your scene for 20k iterations, the checkpoints will be sav
 To start training for editing the GS, run the following command:
 
 ```bash
-ns-train igs2gs --data {PROCESSED_DATA_DIR} --load-dir {outputs/.../nerfstudio_models} --pipeline.prompt {"prompt"} --pipeline.guidance-scale 7.5 --pipeline.image-guidance-scale 1.5
+ns-train igs2gs --data {PROCESSED_DATA_DIR} --load-dir {outputs/.../nerfstudio_models} --pipeline.prompt {"prompt"} --pipeline.guidance-scale 12.5 --pipeline.image-guidance-scale 1.5
 ```
 
 The `{PROCESSED_DATA_DIR}` must be the same path as used in training the original GS. Using the CLI commands, you can choose the prompt and the guidance scales used for InstructPix2Pix.
@@ -64,17 +64,13 @@ After the GS is trained, you can render the GS using the standard Nerfstudio wor
 ***Important***
 Please note that training the GS on images with resolution larger than 512 will likely cause InstructPix2Pix to throw OOM errors. Moreover, it seems InstructPix2Pix performs significantly worse on images at higher resolution. We suggest training with a resolution that is around 512 (max dimension), so add the following tag to the end of both your `gaussian-splatting` and `igs2gs` training command: `nerfstudio-data --downscale-factor {2,4,6,8}` to the end of your `ns-train` commands. Alternatively, you can downscale your dataset yourself and update your `transforms.json` file (scale down w, h, fl_x, fl_y, cx, cy), or you can use a smaller image scale provided by Nerfstudio.
 
-We recommend capturing data using images from Polycam, as smaller datasets work better and faster with our method.
-
 If you have multiple GPUs, training can be sped up by placing InstructPix2Pix on a separate GPU. To do so, add `--pipeline.ip2p-device cuda:{device-number}` to your training command.
-
-Our method uses ~16K rays and LPIPS, but not all GPUs have enough memory to run this configuration. As a result, we have provided two alternative configurations which use less memory, but be aware that these configurations lead to decreased performance. The differences are the precision used for IntructPix2Pix and whether LPIPS is used (which requires 4x more rays). The details of each config is provided in the table below.
 
 | Method | Description | Memory | Quality |
 | ---------------------------------------------------------------------------------------------------- | -------------- | ----------------------------------------------------------------- | ----------------------- |
 | `igs2gs` | Full model, used in paper | ~15GB | Best |
 
-Currently, we set the max number of iterations for `igs2gs` training to be 15k iteratios. Most often, the edit will look good after ~10k iterations. If you would like to train for longer, just reload your last `igs2gs` checkpoint and continue training, or change `--max-num-iterations 30000`.
+Currently, we set the max number of iterations for `igs2gs` training to be 7.5k iteratios. Most often, the edit will look good after ~5k iterations. If you would like to train for longer, just reload your last `igs2gs` checkpoint and continue training, or change `--max-num-iterations 10000`.
 
 ## Tips
 
