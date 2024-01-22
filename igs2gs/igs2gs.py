@@ -28,11 +28,11 @@ from nerfstudio.model_components.losses import (
     MSELoss,
     interlevel_loss,
 )
-from nerfstudio.models.gaussian_splatting import GaussianSplattingModel, GaussianSplattingModelConfig
+from nerfstudio.models.splatfacto import SplatfactoModel, SplatfactoModelConfig
 
 
 @dataclass
-class InstructGS2GSModelConfig(GaussianSplattingModelConfig):
+class InstructGS2GSModelConfig(SplatfactoModelConfig):
     """Configuration for the InstructGS2GSModel."""
     _target: Type = field(default_factory=lambda: InstructGS2GSModel)
     use_lpips: bool = True
@@ -44,7 +44,7 @@ class InstructGS2GSModelConfig(GaussianSplattingModelConfig):
     lpips_loss_mult: float = 1.0
     """Multiplier for LPIPS loss."""
 
-class InstructGS2GSModel(GaussianSplattingModel):
+class InstructGS2GSModel(SplatfactoModel):
     """Model for InstructGS2GS."""
 
     config: InstructGS2GSModelConfig

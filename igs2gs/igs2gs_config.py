@@ -25,7 +25,7 @@ from nerfstudio.plugins.types import MethodSpecification
 from nerfstudio.data.dataparsers.colmap_dataparser import ColmapDataParserConfig
 from nerfstudio.data.datamanagers.full_images_datamanager import FullImageDatamanagerConfig,FullImageDatamanager
 from nerfstudio.pipelines.base_pipeline import VanillaPipelineConfig
-from nerfstudio.models.gaussian_splatting import GaussianSplattingModelConfig
+from nerfstudio.models.splatfacto import SplatfactoModelConfig
 from nerfstudio.engine.trainer import TrainerConfig
 
 
@@ -47,7 +47,7 @@ igs2gs_method = MethodSpecification(
         gradient_accumulation_steps = {'camera_opt': 100,'color':10,'shs':10},
         pipeline=InstructGS2GSPipelineConfig(
             datamanager=InstructGS2GSDataManagerConfig(
-                dataparser=ColmapDataParserConfig(load_3D_points=True),
+                dataparser=NerfstudioDataParserConfig(load_3D_points=True),
             ),
             model=InstructGS2GSModelConfig(),
         ),
