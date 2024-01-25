@@ -119,8 +119,6 @@ class InstructGS2GSPipeline(VanillaPipeline):
 
             original_image = self.datamanager.original_cached_train[idx]["image"].unsqueeze(dim=0).permute(0, 3, 1, 2)
             rendered_image = model_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
-            plt.imsave("testing_seq_edits/original_image_"+str(idx)+".jpg", original_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
-            plt.imsave("testing_seq_edits/rendered_image_"+str(idx)+".jpg", rendered_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
 
             edited_image = self.ip2p.edit_image(
                         self.text_embedding.to(self.ip2p_device),
@@ -139,7 +137,6 @@ class InstructGS2GSPipeline(VanillaPipeline):
 
             # write edited image to dataloader
             edited_image = edited_image.to(original_image.dtype)
-            plt.imsave("testing_seq_edits/edited_image_"+ str(idx)+".jpg", edited_image.squeeze().permute(1, 2, 0).detach().cpu().numpy())
             self.datamanager.cached_train[idx]["image"] = edited_image.squeeze().permute(1,2,0)
             data["image"] = edited_image.squeeze().permute(1,2,0)
 

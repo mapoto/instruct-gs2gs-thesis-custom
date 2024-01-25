@@ -92,5 +92,11 @@ To build off Instruct-GS2GS, we provide explanations of the core code components
 
 `igs2gs.py`: We overwrite the `get_loss_dict` method to use LPIPs loss and L1Loss.
 
-# Citation
-Cyrus Vachha and Ayaan Haque
+## Bibtex
+If you use this work or find it helpful, please consider citing: (bibtex)
+<pre id="codecell0">@misc{igs2gs,
+&nbsp;author = {Vachha, Cyrus and Haque, Ayaan},
+&nbsp;title = {Instruct-GS2GS: Editing 3D Gaussian Splats with Instructions},
+&nbsp;year = {2024},
+&nbsp;url = {https://instruct-gs2gs.github.io/}
+} </pre>
