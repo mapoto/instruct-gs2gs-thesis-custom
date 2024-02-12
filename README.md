@@ -3,6 +3,8 @@
 
 ![teaser](imgs/igs2gs_teaser.png)
 
+This codebase is a fork of the original [Instruct-NeRF2NeRF](https://github.com/ayaanzhaque/instruct-nerf2nerf) repository.
+
 # Installation
 
 ## 1. Install Nerfstudio dependencies
