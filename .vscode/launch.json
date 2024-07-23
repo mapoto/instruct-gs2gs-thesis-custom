@@ -1,0 +1,31 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "debugpy",
+            "request": "launch",
+            "name": "ns-train igs2gs",
+            "program": "/data_storage/Lucky_Thesis_Data/code/nerfstudio/nerfstudio/scripts/train.py",
+            "args": [
+                "igs2gs",
+                "--data",
+                "/data_storage/Lucky_Thesis_Data/dataset/lucky_2/center_crop/original/lucky_2_cc_splatfacto/",
+                "--load-dir",
+                "/data_storage/Lucky_Thesis_Data/code/instruct-gs2gs/outputs/lucky_2_cc_splatfacto/splatfacto/2024-07-08_181916/nerfstudio_models",
+                "--pipeline.prompt",
+                "turn him into a clown",
+                "--pipeline.guidance-scale",
+                "7.5",
+                "--pipeline.image-guidance-scale",
+                "1.5",
+                "nerfstudio-data",
+                "--downscale-factor",
+                "4"
+            ],
+            "justMyCode": false,
+        },
+    ]
+}

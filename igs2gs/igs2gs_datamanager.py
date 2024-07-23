@@ -17,7 +17,7 @@ Instruct-GS2GS Datamanager.
 """
 from __future__ import annotations
 
-'''
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -32,7 +32,7 @@ from nerfstudio.data.datamanagers.base_datamanager import (
     VanillaDataManager,
     VanillaDataManagerConfig,
 )
-'''
+"""
 ############
 
 
@@ -77,15 +77,16 @@ from nerfstudio.data.datamanagers.base_datamanager import DataManager, DataManag
 from nerfstudio.data.dataparsers.base_dataparser import DataparserOutputs
 from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataParserConfig
 from nerfstudio.data.datasets.base_dataset import InputDataset
-from nerfstudio.data.datamanagers.full_images_datamanager import FullImageDatamanagerConfig,FullImageDatamanager
+from nerfstudio.data.datamanagers.full_images_datamanager import FullImageDatamanagerConfig, FullImageDatamanager
 
 # from nerfstudio.data.utils.dataloaders import FixedIndicesEvalDataloader
 from nerfstudio.utils.misc import get_orig_class
 from nerfstudio.utils.rich_utils import CONSOLE
 
+print("################## Executing script " + __file__ + " ##################")
+
 
 @dataclass
-
 class InstructGS2GSDataManagerConfig(FullImageDatamanagerConfig):
     _target: Type = field(default_factory=lambda: InstructGS2GSDataManager)
     dataparser: AnnotatedDataParserUnion = NerfstudioDataParserConfig()
@@ -102,12 +103,13 @@ class InstructGS2GSDataManagerConfig(FullImageDatamanagerConfig):
     """Specifies the image indices to use during eval; if None, uses all."""
     cache_images: Literal["no-cache", "cpu", "gpu"] = "cpu"
     """Whether to cache images in memory. If "numpy", caches as numpy arrays, if "torch", caches as torch tensors."""
-    
-#InstructGS2GSDataManager(VanillaDataManager):
+
+
+# InstructGS2GSDataManager(VanillaDataManager):
 class InstructGS2GSDataManager(FullImageDatamanager):
-    
+
     config: InstructGS2GSDataManagerConfig
-    
+
     def __init__(
         self,
         config: FullImageDatamanagerConfig,
@@ -117,19 +119,25 @@ class InstructGS2GSDataManager(FullImageDatamanager):
         local_rank: int = 0,
         **kwargs,
     ):
+        print(
+            "------------ ",
+            __file__,
+            "------------ initialize InstructGS2GSDataManager with test_mode " + str(test_mode),
+        )
 
         super().__init__(config, device, test_mode, world_size, local_rank, **kwargs)
         # cache original training images for ip2p
         self.original_cached_train = deepcopy(self.cached_train)
         self.original_cached_eval = deepcopy(self.cached_eval)
-        
+
         # Some logic to make sure we sample every camera in equal amounts
         self.editing_unseen_cameras = [i for i in range(len(self.train_dataset))]
-        
+
     def next_train_idx(self, idx: int) -> Tuple[Cameras, Dict]:
         """Returns the next training batch
-
         Returns a Camera instead of raybundle"""
+
+        print("------------ ", __file__, "------------ next_train_idx InstructGS2GSDataManager with idx", idx)
         data = deepcopy(self.cached_train[idx])
         data["image"] = data["image"].to(self.device)
 
@@ -138,4 +146,6 @@ class InstructGS2GSDataManager(FullImageDatamanager):
         if camera.metadata is None:
             camera.metadata = {}
         camera.metadata["cam_idx"] = idx
+
+        print("------------ ", __file__, "------------ return next_train_idx ", data.keys())
         return camera, data

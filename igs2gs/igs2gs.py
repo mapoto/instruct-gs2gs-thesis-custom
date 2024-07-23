@@ -30,10 +30,13 @@ from nerfstudio.model_components.losses import (
 )
 from nerfstudio.models.splatfacto import SplatfactoModel, SplatfactoModelConfig
 
+print("################## Executing script " + __file__ + " ##################")
+
 
 @dataclass
 class InstructGS2GSModelConfig(SplatfactoModelConfig):
     """Configuration for the InstructGS2GSModel."""
+
     _target: Type = field(default_factory=lambda: InstructGS2GSModel)
     use_lpips: bool = True
     """Whether to use LPIPS loss"""
@@ -44,10 +47,14 @@ class InstructGS2GSModelConfig(SplatfactoModelConfig):
     lpips_loss_mult: float = 1.0
     """Multiplier for LPIPS loss."""
 
+
 class InstructGS2GSModel(SplatfactoModel):
     """Model for InstructGS2GS."""
 
     config: InstructGS2GSModelConfig
+
+    print("------------ ", __file__, " Initialize InstructGS2GSModel")
+
     '''
     def populate_modules(self):
         """Required to use L1 Loss."""
@@ -58,7 +65,7 @@ class InstructGS2GSModel(SplatfactoModel):
         else:
             self.rgb_loss = MSELoss()
         self.lpips = LearnedPerceptualImagePatchSimilarity()
-    
+
     def get_loss_dict(self, outputs, batch, metrics_dict=None):
         loss_dict = {}
         image = batch["image"].to(self.device)

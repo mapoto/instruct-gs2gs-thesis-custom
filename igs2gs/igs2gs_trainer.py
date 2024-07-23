@@ -21,9 +21,13 @@ import torch
 from nerfstudio.engine.trainer import Trainer, TrainerConfig
 from nerfstudio.utils.decorators import check_main_thread
 
+print("################## Executing script " + __file__ + " ##################")
+
+
 @dataclass
 class InstructGS2GSTrainerConfig(TrainerConfig):
     """Configuration for the InstructGS2GSTrainer."""
+
     _target: Type = field(default_factory=lambda: InstructGS2GSTrainer)
 
 
@@ -31,7 +35,7 @@ class InstructGS2GSTrainer(Trainer):
     """Trainer for InstructGS2GS"""
 
     def __init__(self, config: TrainerConfig, local_rank: int = 0, world_size: int = 1) -> None:
-
+        print("------------ ", __file__, "  initialize InstructGS2GSTrainer with config " + config.method_name)
         super().__init__(config, local_rank, world_size)
 
     @check_main_thread
@@ -40,6 +44,7 @@ class InstructGS2GSTrainer(Trainer):
         Args:
             step: number of steps in training for given checkpoint
         """
+
         # possibly make the checkpoint directory
         if not self.checkpoint_dir.exists():
             self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -49,9 +54,11 @@ class InstructGS2GSTrainer(Trainer):
         torch.save(
             {
                 "step": step,
-                "pipeline": self.pipeline.module.state_dict()  # type: ignore
-                if hasattr(self.pipeline, "module")
-                else pipeline_state_dict,
+                "pipeline": (
+                    self.pipeline.module.state_dict()  # type: ignore
+                    if hasattr(self.pipeline, "module")
+                    else pipeline_state_dict
+                ),
                 "optimizers": {k: v.state_dict() for (k, v) in self.optimizers.optimizers.items()},
                 "scalers": self.grad_scaler.state_dict(),
             },
@@ -63,3 +70,4 @@ class InstructGS2GSTrainer(Trainer):
             for f in self.checkpoint_dir.glob("*"):
                 if f != ckpt_path:
                     f.unlink()
+        print("------------ ", __file__, " save_checkpoint InstructGS2GSTrainer at step", step, "to", ckpt_path)
