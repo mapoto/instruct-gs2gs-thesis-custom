@@ -75,6 +75,8 @@ class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     """Second device to place InstructPix2Pix on. If None, will use the same device as the pipeline"""
     ip2p_use_full_precision: bool = False
     """Whether to use full precision for InstructPix2Pix"""
+    max_num_iterations: int = 7500
+    """Maximum number of iterations to run the pipeline"""
 
 
 class InstructGS2GSPipeline(VanillaPipeline):
@@ -131,6 +133,9 @@ class InstructGS2GSPipeline(VanillaPipeline):
         """
 
         # print("------------ ", __file__, " get_train_loss_dict InstructGS2GSPipeline at step", step)
+        if step == 30000:
+            with open(self.img_outpath / "losses.csv", "w") as f:
+                f.write("step,main_loss,scale_reg,psnr,gaussian_count\n")
 
         if ((step - 1) % self.config.gs_steps) == 0:
             self.makeSquentialEdits = True
@@ -153,6 +158,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
             #     " makeSquentialEdits setting metrics_dict gaussian_count",
             #     metrics_dict["gaussian_count"],
             # )
+            # loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
 
         else:
             print(
@@ -170,6 +176,13 @@ class InstructGS2GSPipeline(VanillaPipeline):
                 camera, data = self.datamanager.next_train_idx(idx)
                 model_outputs = self.model(camera)
                 metrics_dict = self.model.get_metrics_dict(model_outputs, data)
+
+                Path(self.img_outpath / str(step)).mkdir(parents=True, exist_ok=True)
+
+                self.to_image(data["image"]).save(
+                    Path(self.img_outpath / str(step) / (str(data["image_idx"]) + "_data.png"))
+                )
+
                 # print("------------ ", __file__, " makeSquentialEdits setting metrics_dict", metrics_dict.keys())
                 # print(
                 #     "------------ ",
@@ -188,8 +201,6 @@ class InstructGS2GSPipeline(VanillaPipeline):
                     self.datamanager.original_cached_train[idx]["image"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
                 )
                 rendered_image = model_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
-
-                Path(self.img_outpath / str(step)).mkdir(parents=True, exist_ok=True)
 
                 image_cond_latents = self.ip2p.prepare_image_latents(
                     image=original_image,
@@ -234,7 +245,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
                 original_image.save(Path(self.img_outpath / str(step) / f"{str(self.curr_edit_idx)}_original.png"))
 
                 # save edited image
-                result = self.to_image(data["image"])
+                result = self.to_image(edited_image)
                 result.save(Path(self.img_outpath / str(step) / f"{str(self.curr_edit_idx)}_edited.png"))
 
                 # increment curr edit idx
@@ -249,20 +260,39 @@ class InstructGS2GSPipeline(VanillaPipeline):
             if self.curr_edit_idx >= len(self.datamanager.cached_train):
                 self.curr_edit_idx = 0
                 self.makeSquentialEdits = False
-                self.config.guidance_scale += 1.5
+                self.config.guidance_scale += 1
 
-                print(
-                    "------------ ",
-                    __file__,
-                    f"------------ finished editing and updating image idx {self.curr_edit_idx}",
-                )
+        # if (step + 1) == self.config.max_num_iterations:
+        #     last_path = Path(self.img_outpath / str(step))
+        #     last_path.mkdir(parents=True, exist_ok=True)
+
+        #     for idx in range(0, len(self.datamanager.original_cached_train)):
+
+        #         camera, data = self.datamanager.next_train_idx(idx)
+        #         model_outputs = self.model(camera)
+        #         rendered_image = model_outputs["rgb"]
+        #         rendered_image = self.to_image(rendered_image)
+        #         rendered_image.save(last_path / f"{str(self.curr_edit_idx)}_render.png")
 
         loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
-        # print("------------ ", __file__, "------------ loss_dict", loss_dict.keys())
-        # print("------------ ", __file__, "------------ loss_dict main_loss", list(loss_dict["main_loss"].size()))
-        # print("------------ ", __file__, "------------ loss_dict scale_reg", list(loss_dict["scale_reg"].size()))
+
+        main_loss = loss_dict["main_loss"].detach().cpu().item()
+        scale_reg = loss_dict["scale_reg"].detach().cpu().item()
+        metric = metrics_dict["psnr"].detach().cpu().item()
+        gaussian = metrics_dict["gaussian_count"]
+
+        with open(self.img_outpath / "losses.csv", "a+") as f:
+            f.write(f"{step},{main_loss},{scale_reg},{metric},{gaussian}\n")
 
         return model_outputs, loss_dict, metrics_dict
+
+    def aggregate_data(self, data: typing.List[typing.Dict]) -> typing.Dict:
+        """Aggregate data"""
+        return data[0]
+
+    def aggregate_model_outputs(self, model_outputs: typing.List[torch.Tensor]) -> torch.Tensor:
+        """Aggregate model outputs"""
+        return torch.stack(model_outputs).mean(dim=0)
 
     def to_image(self, tensor: torch.Tensor) -> Image:
         """Convert a tensor to an image"""
@@ -270,7 +300,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
 
     def do_similarity_check(self, trained, length, model_name="ViT-L/14", top_n=100):
         """Do similarity check for InstructPix2Pix"""
-        print("------------ ", __file__, " do_similarity_check InstructGS2GSPipeline")
+        # print("------------ ", __file__, " do_similarity_check InstructGS2GSPipeline")
         images = [trained[idx]["image"].permute(2, 0, 1).unsqueeze(0) for idx in range(length)]
         # images = torch.cat(images).to(self.ip2p_device)
 
@@ -281,8 +311,8 @@ class InstructGS2GSPipeline(VanillaPipeline):
         idx = [f"{idx}.png" for idx in range(length)]
         least_similar_pairs = cm.find_least_similar(similarity_matrix, idx, top_n=top_n)
         torch.cuda.empty_cache()
-        for (file1, file2), score in least_similar_pairs:
-            print(f"Images: {file1} and {file2} have a similarity score of {score:.4f}")
+        # for (file1, file2), score in least_similar_pairs:
+        #     print(f"Images: {file1} and {file2} have a similarity score of {score:.4f}")
 
         return least_similar_pairs
 
@@ -292,7 +322,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
 
 
 def store_similarity_matrix(csv_filename, least_similar_pairs):
-    print(least_similar_pairs)
+    """Store the similarity matrix in a CSV file"""
 
     # Open the file in write mode
     with open(csv_filename, mode="w", newline="") as file:

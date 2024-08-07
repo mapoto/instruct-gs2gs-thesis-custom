@@ -37,6 +37,16 @@ class InstructGS2GSTrainer(Trainer):
     def __init__(self, config: TrainerConfig, local_rank: int = 0, world_size: int = 1) -> None:
         print("------------ ", __file__, "  initialize InstructGS2GSTrainer with config " + config.method_name)
         super().__init__(config, local_rank, world_size)
+        print(
+            "------------ ",
+            __file__,
+            "----------- change config.pipeline.max_num_iterations from ",
+            config.pipeline.max_num_iterations,
+            " to ",
+            config.max_num_iterations,
+        )
+
+        config.pipeline.max_num_iterations = config.max_num_iterations  # un
 
     @check_main_thread
     def save_checkpoint(self, step: int) -> None:

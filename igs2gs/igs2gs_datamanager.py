@@ -137,7 +137,7 @@ class InstructGS2GSDataManager(FullImageDatamanager):
         """Returns the next training batch
         Returns a Camera instead of raybundle"""
 
-        print("------------ ", __file__, "------------ next_train_idx InstructGS2GSDataManager with idx", idx)
+        # print("------------ ", __file__, "------------ next_train_idx InstructGS2GSDataManager with idx", idx)
         data = deepcopy(self.cached_train[idx])
         data["image"] = data["image"].to(self.device)
 
@@ -147,5 +147,5 @@ class InstructGS2GSDataManager(FullImageDatamanager):
             camera.metadata = {}
         camera.metadata["cam_idx"] = idx
 
-        print("------------ ", __file__, "------------ return next_train_idx ", data.keys())
+        # print("------------ ", __file__, "------------ return next_train_idx ", data.keys())
         return camera, data
