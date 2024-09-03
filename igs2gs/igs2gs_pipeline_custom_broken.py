@@ -63,7 +63,7 @@ class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     """(text) guidance scale for InstructPix2Pix"""
     image_guidance_scale: float = 1.5
     """image guidance scale for InstructPix2Pix"""
-    gs_steps: int = 2500
+    gs_steps: int = 20000
     """how many GS steps between dataset updates"""
     diffusion_steps: int = 20
     """Number of diffusion steps to take for InstructPix2Pix"""
@@ -75,7 +75,7 @@ class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     """Second device to place InstructPix2Pix on. If None, will use the same device as the pipeline"""
     ip2p_use_full_precision: bool = False
     """Whether to use full precision for InstructPix2Pix"""
-    max_num_iterations: int = 7500
+    max_num_iterations: int = 20000
     """Maximum number of iterations to run the pipeline"""
 
 
@@ -275,14 +275,6 @@ class InstructGS2GSPipeline(VanillaPipeline):
         #         rendered_image.save(last_path / f"{str(self.curr_edit_idx)}_render.png")
 
         loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
-
-        main_loss = loss_dict["main_loss"].detach().cpu().item()
-        scale_reg = loss_dict["scale_reg"].detach().cpu().item()
-        metric = metrics_dict["psnr"].detach().cpu().item()
-        gaussian = metrics_dict["gaussian_count"]
-
-        with open(self.img_outpath / "losses.csv", "a+") as f:
-            f.write(f"{step},{main_loss},{scale_reg},{metric},{gaussian}\n")
 
         main_loss = loss_dict["main_loss"].detach().cpu().item()
         scale_reg = loss_dict["scale_reg"].detach().cpu().item()
