@@ -78,7 +78,7 @@ def find_least_similar(similarity_matrix, filenames, top_n=3):
 
 
 def main(folder_path, model_name="ViT-L/14", top_n=3):
-    clip_model = ClipSimilarity(model_name).to("cuda")
+    clip_model = ClipSimilarity("./models/" + model_name).to("cuda")
     filenames, images = load_images_from_folder(folder_path)
     image_features = clip_model.encode_image(images)
     similarity_matrix = clip_model.compute_all_similarities(image_features)
