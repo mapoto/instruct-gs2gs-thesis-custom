@@ -30,8 +30,6 @@ from nerfstudio.model_components.losses import (
 )
 from nerfstudio.models.splatfacto import SplatfactoModel, SplatfactoModelConfig
 
-print("################## Executing script " + __file__ + " ##################")
-
 
 @dataclass
 class InstructGS2GSModelConfig(SplatfactoModelConfig):
@@ -52,8 +50,6 @@ class InstructGS2GSModel(SplatfactoModel):
     """Model for InstructGS2GS."""
 
     config: InstructGS2GSModelConfig
-
-    print("------------ ", __file__, " Initialize InstructGS2GSModel")
 
     '''
     def populate_modules(self):

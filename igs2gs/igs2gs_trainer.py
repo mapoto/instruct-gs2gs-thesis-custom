@@ -21,8 +21,6 @@ import torch
 from nerfstudio.engine.trainer import Trainer, TrainerConfig
 from nerfstudio.utils.decorators import check_main_thread
 
-print("################## Executing script " + __file__ + " ##################")
-
 
 @dataclass
 class InstructGS2GSTrainerConfig(TrainerConfig):
@@ -35,7 +33,6 @@ class InstructGS2GSTrainer(Trainer):
     """Trainer for InstructGS2GS"""
 
     def __init__(self, config: TrainerConfig, local_rank: int = 0, world_size: int = 1) -> None:
-        print("------------ ", __file__, "  initialize InstructGS2GSTrainer with config " + config.method_name)
         super().__init__(config, local_rank, world_size)
         # print(
         #     "------------ ",
@@ -80,4 +77,3 @@ class InstructGS2GSTrainer(Trainer):
             for f in self.checkpoint_dir.glob("*"):
                 if f != ckpt_path:
                     f.unlink()
-        print("------------ ", __file__, " save_checkpoint InstructGS2GSTrainer at step", step, "to", ckpt_path)

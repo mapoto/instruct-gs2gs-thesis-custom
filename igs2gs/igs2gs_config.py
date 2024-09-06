@@ -31,11 +31,11 @@ from nerfstudio.engine.trainer import TrainerConfig
 from igs2gs.igs2gs_datamanager import InstructGS2GSDataManagerConfig
 from igs2gs.igs2gs import InstructGS2GSModelConfig
 
-# from igs2gs.igs2gs_pipeline import InstructGS2GSPipelineConfig
-from igs2gs.igs2gs_pipeline_custom import InstructGS2GSPipelineConfig
+from igs2gs.igs2gs_pipeline import InstructGS2GSPipelineConfig
+
+# from igs2gs.igs2gs_pipeline_custom import InstructGS2GSPipelineConfig
 from igs2gs.igs2gs_trainer import InstructGS2GSTrainerConfig
 
-print("################## Executing script " + __file__ + " ##################")
 
 igs2gs_method = MethodSpecification(
     config=InstructGS2GSTrainerConfig(
@@ -44,7 +44,7 @@ igs2gs_method = MethodSpecification(
         steps_per_eval_batch=100,
         steps_per_save=500,
         steps_per_eval_all_images=100000,
-        max_num_iterations=7500,
+        max_num_iterations=10000,
         mixed_precision=False,
         gradient_accumulation_steps={"camera_opt": 100, "color": 10, "shs": 10},
         pipeline=InstructGS2GSPipelineConfig(
@@ -88,6 +88,3 @@ igs2gs_method = MethodSpecification(
     ),
     description="Instruct-GS2GS primary method: uses LPIPS, IP2P at full precision",
 )
-
-
-print("------------ ", __file__, "----------- igs2gs_config.py loaded")
