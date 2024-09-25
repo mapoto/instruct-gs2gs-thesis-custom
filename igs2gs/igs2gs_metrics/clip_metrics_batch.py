@@ -7,6 +7,7 @@ from einops import rearrange
 from torchvision import io
 from itertools import combinations
 from torch.cuda.amp import autocast
+import torch.amp as amp
 
 
 class ClipSimilarity(nn.Module):
@@ -28,7 +29,7 @@ class ClipSimilarity(nn.Module):
         return text_features
 
     def encode_image(self, image):  # Input images in range [0, 1].
-        with autocast():
+        with amp.autocast("cuda"):
             image = F.interpolate(image.float(), size=self.size, mode="bicubic", align_corners=False)
             image = image - rearrange(self.mean, "c -> 1 c 1 1")
             image = image / rearrange(self.std, "c -> 1 c 1 1")
@@ -79,16 +80,16 @@ def process_images_in_batches(clip_model, images, batch_size):
     return torch.cat(image_features_list)
 
 
-def find_least_similar(similarity_matrix, filenames, top_n=3, threshold=0.5):
+def find_least_similar(similarity_matrix, filenames, top_n=None, threshold=0.5):
     n = similarity_matrix.shape[0]
     similarities = []
     for i in range(n):
         for j in range(i + 1, n):
             similarity_score = similarity_matrix[i, j].item()
-            if similarity_score >= threshold:  # Filter out scores below threshold
+            if similarity_score <= threshold:  # Filter out scores below threshold
                 similarities.append(((filenames[i], filenames[j]), similarity_score))
     similarities.sort(key=lambda x: x[1])  # Sort by similarity score
-    return similarities[:top_n]
+    return similarities[:top_n] if top_n is not None else similarities
 
 
 def main(folder_path, model_name="ViT-L/14", top_n=3, batch_size=4):
