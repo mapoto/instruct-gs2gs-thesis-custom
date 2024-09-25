@@ -116,6 +116,7 @@ class InstructPix2Pix(nn.Module):
         diffusion_steps: int = 20,
         lower_bound: float = 0.70,
         upper_bound: float = 0.98,
+        seed: int = None,
     ) -> torch.Tensor:
         """Edit an image for Instruct-GS2GS using InstructPix2Pix
         Args:

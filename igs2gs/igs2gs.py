@@ -19,7 +19,7 @@ Model for InstructGS2GS
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Type
+from typing import Tuple, Type
 
 import torch
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
@@ -29,6 +29,7 @@ from nerfstudio.model_components.losses import (
     interlevel_loss,
 )
 from nerfstudio.models.splatfacto import SplatfactoModel, SplatfactoModelConfig
+from nerfstudio.model_components.lib_bilagrid import BilateralGrid, color_correct, slice, total_variation_loss
 
 
 @dataclass
@@ -44,13 +45,16 @@ class InstructGS2GSModelConfig(SplatfactoModelConfig):
     """Patch size to use for LPIPS loss."""
     lpips_loss_mult: float = 1.0
     """Multiplier for LPIPS loss."""
+    # use_bilateral_grid: bool = True
+    # """Whether to use bilateral grid."""
+    # grid_shape: Tuple[int, int, int] = (16, 16, 8)
+    # """Shape of the bilateral grid (X, Y, W)"""
 
 
 class InstructGS2GSModel(SplatfactoModel):
     """Model for InstructGS2GS."""
 
     config: InstructGS2GSModelConfig
-
     '''
     def populate_modules(self):
         """Required to use L1 Loss."""

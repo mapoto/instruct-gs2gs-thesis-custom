@@ -34,6 +34,7 @@ class InstructGS2GSTrainer(Trainer):
 
     def __init__(self, config: TrainerConfig, local_rank: int = 0, world_size: int = 1) -> None:
         super().__init__(config, local_rank, world_size)
+        self.save_only_latest_checkpoint = False
 
     @check_main_thread
     def save_checkpoint(self, step: int) -> None:
@@ -62,7 +63,7 @@ class InstructGS2GSTrainer(Trainer):
             ckpt_path,
         )
         # possibly delete old checkpoints
-        if self.config.save_only_latest_checkpoint:
+        if self.save_only_latest_checkpoint:
             # delete everything else in the checkpoint folder
             for f in self.checkpoint_dir.glob("*"):
                 if f != ckpt_path:

@@ -42,14 +42,14 @@ igs2gs_method = MethodSpecification(
         method_name="igs2gs",
         steps_per_eval_image=100,
         steps_per_eval_batch=100,
-        steps_per_save=500,
-        steps_per_eval_all_images=100000,
-        max_num_iterations=10000,
+        steps_per_save=1000,
+        steps_per_eval_all_images=500,
+        max_num_iterations=5001,
         mixed_precision=False,
         gradient_accumulation_steps={"camera_opt": 100, "color": 10, "shs": 10},
         pipeline=InstructGS2GSPipelineConfig(
             datamanager=InstructGS2GSDataManagerConfig(
-                dataparser=NerfstudioDataParserConfig(load_3D_points=True),
+                dataparser=NerfstudioDataParserConfig(load_3D_points=True, eval_mode="all"),
             ),
             model=InstructGS2GSModelConfig(),
         ),
@@ -82,6 +82,12 @@ igs2gs_method = MethodSpecification(
                 "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(lr_final=5e-5, max_steps=30000),
             },
+            # "bilateral-grid": {
+            #     "optimizer": AdamOptimizerConfig(lr=0.002, eps=1e-15, max_norm=None, weight_decay=0),
+            #     "scheduler": ExponentialDecaySchedulerConfig(
+            #         lr_pre_warmup=0, lr_final=0.0001, warmup_steps=1000, max_steps=30000, ramp="cosine"
+            #     ),
+            # },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",

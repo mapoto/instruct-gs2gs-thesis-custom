@@ -149,3 +149,9 @@ class InstructGS2GSDataManager(FullImageDatamanager):
 
         # print("------------ ", __file__, "------------ return next_train_idx ", data.keys())
         return camera, data
+
+    def update_image_data(self, idx: int, image: torch.Tensor):
+        """Updates the image data at index idx"""
+        # print("------------ ", __file__, "------------ update_image_data InstructGS2GSDataManager with idx", idx)
+        _, data = self.next_train_idx(idx)
+        data["image"] = image

@@ -42,7 +42,7 @@ from nerfstudio.pipelines.base_pipeline import (
 from nerfstudio.data.datamanagers.full_images_datamanager import FullImageDatamanagerConfig, FullImageDatamanager
 
 from rembg import remove, new_session
-from igs2gs.matching.depth_matching import gs_matching
+
 
 CAM_ADJ_MATRICES = {
     "Simon": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/simon.csv")).values),
@@ -145,7 +145,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
         self.camera_adj_matrix = CAM_ADJ_MATRICES[self.config.dataset_name]
 
         # which image index we are editing
-        # self.curr_edit_num = 0
+        self.curr_edit_num = 0
         # whether we are doing regular GS updates or editing images
         self.makeSquentialEdits = False
         self.image_guidance_scale = self.config.image_guidance_scale
@@ -167,10 +167,10 @@ class InstructGS2GSPipeline(VanillaPipeline):
         os.environ["PYTHONHASHSEED"] = str(seed)
         print(f"Random seed set as {seed}")
 
-    def get_camera_batches(self, step: int):
+    def get_camera_batches(self, anchor_idx: int):
         """Get camera batches based on adjacency matrix"""
         batch = []
-        for i, row in enumerate(self.camera_adj_matrix[step]):
+        for i, row in enumerate(self.camera_adj_matrix[anchor_idx]):
             if row == 1:
                 batch.append(i)
         return batch
@@ -180,86 +180,130 @@ class InstructGS2GSPipeline(VanillaPipeline):
         Args:
             step: current iteration step to update sampler if using DDP (distributed)
         """
-        training_camera_length = len(self.datamanager.original_cached_train)
-        print(f"Training camera length: {str(training_camera_length)}")
 
         if step == 30000:
             with open(self.img_outpath / "losses.csv", "w") as f:
                 f.write("step,main_loss,scale_reg,psnr,clip,fid,gaussian_count\n")
 
-        self.makeSquentialEdits = ((step - 1) % self.config.gs_steps) == 0
+        if ((step - 1) % self.config.gs_steps) == 0:
+            self.makeSquentialEdits = True
 
         if self.makeSquentialEdits:
+
             Path(self.img_outpath / str(step)).mkdir(parents=True, exist_ok=True)
-            curr_edit_num = 0
-            print(
-                f"Editing start with guidance scale {self.guidance_scale} and image guidance scale {self.image_guidance_scale}"
-            )
+            clip_ok = True
+            edits_list = list(range(0, len(self.datamanager.original_cached_train)))
+            self.curr_edit_num = 0
+            edited_as_clip_format = {}
+            while clip_ok:
 
-            for camera_idx in range(0, len(self.datamanager.original_cached_train)):
-                print(f"Editing image {camera_idx}")
-                camera, data = self.datamanager.next_train_idx(camera_idx)
-                model_outputs = self.model(camera)
+                edits_length = len(edits_list)
 
-                original_image = (
-                    self.datamanager.original_cached_train[camera_idx]["image"]
-                    .detach()
-                    .unsqueeze(dim=0)
-                    .permute(0, 3, 1, 2)
-                )
-                conditioning_image = original_image[:, :3, :, :]
-                rendered_image = model_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
-                depth_image = model_outputs["depth"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
+                edits_batch = [
+                    edits_list[i : i + self.config.batch_size] for i in range(0, edits_length, self.config.batch_size)
+                ]
 
-                edited_image = self.ip2p.edit_image(
-                    self.text_embedding.to(self.ip2p_device),
-                    rendered_image.to(self.ip2p_device),
-                    conditioning_image.to(self.ip2p_device),
-                    guidance_scale=self.config.guidance_scale,
-                    image_guidance_scale=self.config.image_guidance_scale,
-                    diffusion_steps=self.config.diffusion_steps,
-                    lower_bound=self.config.lower_bound,
-                    upper_bound=self.config.upper_bound,
-                )
+                for batch_indeces in edits_batch:
+                    original_batch = []
+                    conditioning_batch = []
+                    rendered_batch = []
 
-                # resize to original image size (often not necessary)
-                if edited_image.size() != rendered_image.size():
-                    edited_image = torch.nn.functional.interpolate(
-                        edited_image, size=rendered_image.size()[2:], mode="bilinear"
+                    for camera_idx in batch_indeces:
+                        print(f"Editing image {camera_idx}")
+                        camera, data = self.datamanager.next_train_idx(camera_idx)
+                        model_outputs = self.model(camera)
+                        metrics_dict = self.model.get_metrics_dict(model_outputs, data)
+
+                        original_image = (
+                            self.datamanager.original_cached_train[camera_idx]["image"]
+                            .detach()
+                            .unsqueeze(dim=0)
+                            .permute(0, 3, 1, 2)
+                        )
+                        conditioning_image = original_image[:, :3, :, :]
+
+                        rendered_image = model_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
+
+                        original_batch.append(original_image)
+                        conditioning_batch.append(conditioning_image)
+                        rendered_batch.append(rendered_image)
+
+                    original_batch = torch.cat(original_batch, dim=0)
+                    conditioning_batch = torch.cat(conditioning_batch, dim=0)
+                    rendered_batch = torch.cat(rendered_batch, dim=0)
+
+                    # repeat text embedding for each image in batch
+                    text_embedding = torch.cat([self.text_embedding] * len(batch_indeces), dim=0)
+
+                    edited_batch = self.ip2p.edit_image(
+                        text_embedding.to(self.ip2p_device),
+                        rendered_batch.to(self.ip2p_device),
+                        conditioning_batch.to(self.ip2p_device),
+                        guidance_scale=self.guidance_scale,
+                        image_guidance_scale=self.image_guidance_scale,
+                        diffusion_steps=self.config.diffusion_steps,
+                        lower_bound=self.config.lower_bound,
+                        upper_bound=self.config.upper_bound,
                     )
 
-                # apply original mask to the alpha channel of the edited image
-                alpha_channel = original_image[:, 3, :, :].unsqueeze(1).to(edited_image.device)
-                edited_image = torch.cat([edited_image, alpha_channel], dim=1)
+                    # resize to original image size (often not necessary)
+                    if edited_batch.size() != rendered_batch.size():
+                        edited_batch = torch.nn.functional.interpolate(
+                            edited_batch, size=rendered_batch.size()[2:], mode="bilinear"
+                        )
 
-                # edited_as_clip_format.update(
-                #     {
-                #         camera_index: (edited_batch[i, :3, :, :].unsqueeze(0) * 255).byte()
-                #         for i, camera_index in enumerate(batch_indeces)
-                #     }
-                # )
+                    edited_batch = edited_batch.detach().cpu()
 
-                self.update_dataset(data, camera_idx, edited_image, original_image.dtype)
-                self.store_images(
-                    rendered=rendered_image,
-                    original=original_image,
-                    edited=edited_image,
-                    depth=depth_image,
-                    step=step,
-                    camera_index=camera_idx,
+                    # apply original mask to the alpha channel of the edited image
+                    alpha_channel = original_batch[:, 3, :, :].unsqueeze(1)
+                    edited_batch = torch.cat([edited_batch, alpha_channel], dim=1)
+
+                    edited_as_clip_format.update(
+                        {
+                            camera_index: (edited_batch[i, :3, :, :].unsqueeze(0) * 255).byte()
+                            for i, camera_index in enumerate(batch_indeces)
+                        }
+                    )
+
+                    self.update_dataset(batch_indeces, edited_batch)
+                    self.store_images(batch_indeces, rendered_batch, original_batch, edited_batch, step)
+
+                clip_average, clip_similarity = self.do_csmv(list(edited_as_clip_format.values()))
+
+                reedit_candidates = cm.find_least_similar(
+                    clip_similarity, list(edited_as_clip_format.keys()), threshold=0.85
                 )
 
-                # increment curr edit idx
-                curr_edit_num += 1
+                print(f"Re-edit candidates: {reedit_candidates}")
+                print(f"Current editting loop number: {self.curr_edit_num}")
+                reedits_idx = self.reedits_voting(reedit_candidates)
 
-            print(f"Editing finished with {curr_edit_num} images")
+                if len(reedits_idx) == 0:
+                    clip_ok = False
+                    self.makeSquentialEdits = False
+                    self.guidance_scale += self.config.incremental_guidance_scale
+                    self.image_guidance_scale += self.config.incremental_image_guidance_scale
 
-            if curr_edit_num >= len(self.datamanager.cached_train):
-                self.guidance_scale += self.config.incremental_guidance_scale
-                self.image_guidance_scale += self.config.incremental_image_guidance_scale
+                    break
+                else:
+                    edits_list = reedits_idx
+                    self.set_seed(random.randint(0, 100000))
+                    print(f"Re-editing images: {edits_list}")
 
-        # compute losses according to camera batches
-        (model_outputs, loss_dict, metrics_dict, rgb_stack) = self.compute_regional_losses(step)
+            # if self.curr_edit_idx >= len(self.datamanager.cached_train):
+            #     self.curr_edit_idx = 0
+            #     self.makeSquentialEdits = False
+            #     self.guidance_scale += self.config.incremental_guidance_scale
+            #     self.image_guidance_scale += self.config.incremental_image_guidance_scale
+
+        num_samples = (
+            len(self.datamanager.original_cached_train)
+            if not self.makeSquentialEdits
+            else len(self.datamanager.original_cached_train)
+        )
+
+        (model_outputs, loss_dict, metrics_dict, rgb_stack) = self.compute_losses(num_samples)
+        original_images = [self.datamanager.original_cached_train[idx]["image"] for idx in range(num_samples)]
 
         main_loss = loss_dict["main_loss"].detach().cpu().item()
         scale_reg = loss_dict["scale_reg"].detach().cpu().item()
@@ -268,9 +312,9 @@ class InstructGS2GSPipeline(VanillaPipeline):
 
         clip_average = 0
         fid = 0
-        # if (step % 10) == 0:
-        #     # clip_average, clip_matrix = self.do_csmv(rgb_stack)
-        #     fid = self.do_fid_batch(rendered=rgb_stack, original=original_images)
+        if (step % 10) == 0:
+            # clip_average, clip_matrix = self.do_csmv(rgb_stack)
+            fid = self.do_fid_batch(rendered=rgb_stack, original=original_images)
         with open(self.img_outpath / "losses.csv", "a+") as f:
             f.write(f"{step},{main_loss},{scale_reg},{metric},{clip_average},{fid},{gaussian}\n")
 
@@ -285,86 +329,6 @@ class InstructGS2GSPipeline(VanillaPipeline):
             # update dataset with edited image as H x W x C tensor
             self.datamanager.cached_train[camera_index]["image"] = edited_image
             self.datamanager.update_image_data(camera_index, edited_image)
-
-    def update_dataset(self, data, camera_index: int, edited_image: torch.Tensor, dtype: torch.dtype = torch.float32):
-        """Update dataset with new images"""
-
-        edited_image = edited_image.squeeze().permute(1, 2, 0).to(dtype)
-
-        # update dataset with edited image as H x W x C tensor
-        self.datamanager.cached_train[camera_index]["image"] = edited_image
-        self.datamanager.update_image_data(camera_index, edited_image)
-        data["image"] = edited_image.squeeze().permute(1, 2, 0)
-
-    def compute_regional_losses(self, step: int):
-
-        camera, _ = self.datamanager.next_train(step)
-        anchor_idx = camera.metadata["cam_idx"]
-
-        # compute new losses
-        main_loss_list = []
-        scale_reg_list = []
-        metric_list = []
-
-        rgb_stack = []
-        acc_stack = []
-        background_stack = []
-        depth_stack = []
-
-        camera_batch = self.get_camera_batches(anchor_idx)
-        message = ",".join([str(i) for i in camera_batch])
-        print(f"Computing Loss for Camera batch: {message}")
-
-        for camera_idx in camera_batch:
-
-            camera, data = self.datamanager.next_train_idx(camera_idx)
-            model_outputs = self.model(camera)
-            metrics_dict = self.model.get_metrics_dict(model_outputs, data)
-
-            rgb_stack.append(model_outputs["rgb"])
-            acc_stack.append(model_outputs["accumulation"])
-            background_stack.append(model_outputs["background"])
-            depth_stack.append(model_outputs["depth"])
-            loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
-
-            main_loss = loss_dict["main_loss"]
-            scale_reg = loss_dict["scale_reg"]
-            metric = metrics_dict["psnr"]
-
-            main_loss_list.append(main_loss)
-            scale_reg_list.append(scale_reg)
-            metric_list.append(metric)
-
-            self.store_images(
-                step=step,
-                camera_index=camera_idx,
-                rendered=model_outputs["rgb"],
-                original=data["image"],
-                edited=None,
-                depth=model_outputs["depth"],
-            )
-
-        model_outputs = {
-            "rgb": torch.stack(rgb_stack, dim=0),
-            "accumulation": torch.stack(acc_stack, dim=0),
-            "background": torch.stack(background_stack, dim=0),
-            "depth": torch.stack(depth_stack, dim=0),
-        }
-
-        average_main_loss = sum(main_loss_list) / len(main_loss_list)
-
-        average_scale_reg = sum(scale_reg_list) / len(scale_reg_list)
-
-        average_metric = sum(metric_list) / len(metric_list)
-
-        loss_dict = {
-            "main_loss": average_main_loss,
-            "scale_reg": average_scale_reg,
-        }
-
-        metrics_dict["psnr"] = average_metric
-
-        return (model_outputs, loss_dict, metrics_dict, rgb_stack)
 
     def store_images(
         self,
@@ -391,99 +355,9 @@ class InstructGS2GSPipeline(VanillaPipeline):
             result = self.to_image(edited_image.permute(1, 2, 0))
             result.save(Path(self.img_outpath / str(step) / f"{str(camera_index)}_edited.png"))
 
-    def store_images(
-        self,
-        step: int,
-        camera_index: int,
-        rendered: Optional[torch.Tensor] = None,
-        original: Optional[torch.Tensor] = None,
-        edited: Optional[torch.Tensor] = None,
-        depth: Optional[torch.Tensor] = None,
-        height: int = 765,
-        width: int = 512,
-    ):
-
-        save_path = Path(self.img_outpath / str(step))
-        save_path.mkdir(parents=True, exist_ok=True)
-
-        print(f"Saving images for camera index {camera_index}")
-
-        with torch.no_grad():
-            if rendered is not None:
-                # save rendered image
-                rendered_image = self.to_image(
-                    rendered.squeeze(0).permute(1, 2, 0) if len(rendered.shape) == 4 else rendered
-                )
-                rendered_image.save(save_path / f"{str(camera_index)}_render.png")
-                print("Rendered image saved")
-
-            if original is not None:
-                # save original image
-                original_image = self.to_image(
-                    original.squeeze(0).permute(1, 2, 0) if len(original.shape) == 4 else original
-                )
-                original_image.save(save_path / f"{str(camera_index)}_original.png")
-                print("Original image saved")
-
-            if edited is not None:
-                # save edited image
-                edited = self.to_image(edited.squeeze(0).permute(1, 2, 0) if len(edited.shape) == 4 else edited)
-                edited.save(save_path / f"{str(camera_index)}_edited.png")
-                print("Edited image saved")
-
-            if depth is not None:
-                # save depth image
-                depth_image = self.to_image(depth.squeeze(0).permute(1, 2, 0) if len(rendered.shape) == 4 else depth)
-                depth_image.save(save_path / f"{str(camera_index)}_depth.png")
-                print("Depth image saved")
-
-    # def store_images(
-    #     self,
-    #     step: int,
-    #     camera_index: int,
-    #     rendered: Image = None,
-    #     original: Image = None,
-    #     edited: Image = None,
-    #     depth: Image = None,
-    # ):
-
-    #     save_path = Path(self.img_outpath / str(step))
-    #     save_path.mkdir(parents=True, exist_ok=True)
-
-    #     print(f"Saving images for camera index {camera_index}")
-
-    #     with torch.no_grad():
-    #         if rendered is not None:
-    #             # save rendered image
-    #             rendered_image = self.to_image(rendered)
-    #             rendered_image.save(save_path / f"{str(camera_index)}_render.png")
-    #             print("Rendered image saved")
-
-    #         if original is not None:
-    #             # save original image
-    #             original_image = self.to_image(original)
-    #             original_image.save(save_path / f"{str(camera_index)}_original.png")
-    #             print("Original image saved")
-
-    #         if edited is not None:
-    #             # save edited image
-    #             edited = self.to_image(edited)
-    #             edited.save(save_path / f"{str(camera_index)}_edited.png")
-    #             print("Edited image saved")
-
-    #         if depth is not None:
-    #             # save depth image
-    #             depth_image = self.to_image(depth)
-    #             depth_image.save(save_path / f"{str(camera_index)}_depth.png")
-    #             print("Depth image saved")
-
     def to_image(self, tensor: torch.Tensor) -> Image:
         """Convert a tensor to an image"""
-
-        array = (tensor.cpu().numpy() * 255).astype("uint8")
-        if array.shape[-1] == 1:  # handle grayscale images
-            array = array.squeeze(-1)
-        return Image.fromarray(array)
+        return Image.fromarray((tensor.cpu().numpy() * 255).astype("uint8"))
 
     def to_tensor(self, image: Image) -> torch.Tensor:
         """Convert an image to a tensor"""
@@ -513,7 +387,6 @@ class InstructGS2GSPipeline(VanillaPipeline):
         rgb_stack = []
         acc_stack = []
         background_stack = []
-        depth_stack = []
 
         random_indices = random.sample(range(len(self.datamanager.original_cached_train)), num_samples)
 
@@ -528,7 +401,6 @@ class InstructGS2GSPipeline(VanillaPipeline):
             rgb_stack.append(model_outputs["rgb"])
             acc_stack.append(model_outputs["accumulation"])
             background_stack.append(model_outputs["background"])
-            depth_stack.append(model_outputs["depth"])
             loss_dict = self.model.get_loss_dict(model_outputs, data, metrics_dict)
 
             main_loss = loss_dict["main_loss"]
@@ -543,7 +415,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
             "rgb": torch.stack(rgb_stack, dim=0),
             "accumulation": torch.stack(acc_stack, dim=0),
             "background": torch.stack(background_stack, dim=0),
-            "depth": torch.stack(depth_stack, dim=0),
+            "depth": None,
         }
 
         average_main_loss = sum(main_loss_list) / len(main_loss_list)
