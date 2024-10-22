@@ -154,4 +154,5 @@ class InstructGS2GSDataManager(FullImageDatamanager):
         """Updates the image data at index idx"""
         # print("------------ ", __file__, "------------ update_image_data InstructGS2GSDataManager with idx", idx)
         _, data = self.next_train_idx(idx)
+        self.cached_train[idx]["image"] = image
         data["image"] = image

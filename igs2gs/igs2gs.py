@@ -45,6 +45,9 @@ class InstructGS2GSModelConfig(SplatfactoModelConfig):
     """Patch size to use for LPIPS loss."""
     lpips_loss_mult: float = 1.0
     """Multiplier for LPIPS loss."""
+    output_depth_during_training: bool = True
+    """Whether to output depth during training."""
+
     # use_bilateral_grid: bool = True
     # """Whether to use bilateral grid."""
     # grid_shape: Tuple[int, int, int] = (16, 16, 8)

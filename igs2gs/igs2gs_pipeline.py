@@ -4,6 +4,7 @@ Nerfstudio InstructGS2GS Pipeline
 
 import csv
 import datetime
+import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -42,14 +43,11 @@ from nerfstudio.pipelines.base_pipeline import (
 from nerfstudio.data.datamanagers.full_images_datamanager import FullImageDatamanagerConfig, FullImageDatamanager
 
 from rembg import remove, new_session
-from igs2gs.matching.depth_matching import gs_matching
 
-CAM_ADJ_MATRICES = {
-    "Simon": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/simon.csv")).values),
-    "Dora": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/dora.csv")).values),
-    "Ephra": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/ephra.csv")).values),
-    "Irene": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/irene.csv")).values),
-}
+# from igs2gs.matching.depth_matching import gs_matching
+
+
+IMG_OUT_PATH = Path("/media/lucky/486d4773-81cb-4c30-ae5f-8cd74b05a68a/Lucky_Thesis_Data/igs2gs/")
 
 
 @dataclass
@@ -66,7 +64,7 @@ class InstructGS2GSPipelineConfig(VanillaPipelineConfig):
     """prompt for InstructPix2Pix"""
     guidance_scale: float = 5
     """(text) guidance scale for InstructPix2Pix"""
-    image_guidance_scale: float = 3
+    image_guidance_scale: float = 2
     """image guidance scale for InstructPix2Pix"""
     incremental_guidance_scale: float = 0.5
     """incremental guidance scale for InstructPix2Pix"""
@@ -114,16 +112,21 @@ class InstructGS2GSPipeline(VanillaPipeline):
     ):
         super().__init__(config, device, test_mode, world_size, local_rank)
         self.apply_original_masking = config.apply_original_masking
-        self.img_outpath = Path(
-            "/home/lucky/Desktop/ig2g/"
-            + datetime.datetime.now().strftime("%d_%H-%M")
-            + "_"
-            + str(self.config.prompt).replace(" ", "_")
-            + "_"
-            + str(self.config.guidance_scale)
-            + "_"
-            + str(self.config.image_guidance_scale)
+
+        dir_name = "_".join(
+            [
+                datetime.datetime.now().strftime("%m-%d-%H-%M"),
+                str(self.config.dataset_name),
+                str(self.config.prompt).replace(" ", "-"),
+                str(self.config.seed),
+                str(self.config.guidance_scale),
+                str(self.config.incremental_guidance_scale),
+                str(self.config.image_guidance_scale),
+                str(self.config.incremental_image_guidance_scale),
+            ]
         )
+        self.img_outpath = IMG_OUT_PATH / Path(dir_name)
+
         self.img_outpath.mkdir(parents=True, exist_ok=True)
 
         # select device for InstructPix2Pix
@@ -142,7 +145,15 @@ class InstructGS2GSPipeline(VanillaPipeline):
             negative_prompt="deformed",
         )
 
+        CAM_ADJ_MATRICES = {
+            "Simon": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/simon.csv")).values),
+            "Dora": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/dora.csv")).values),
+            "Ephra": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/ephra.csv")).values),
+            "Irene": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/irene.csv")).values),
+        }
+
         self.camera_adj_matrix = CAM_ADJ_MATRICES[self.config.dataset_name]
+        print(f"Camera adjacency matrix: {self.camera_adj_matrix}")
 
         # which image index we are editing
         # self.curr_edit_num = 0
@@ -173,6 +184,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
         for i, row in enumerate(self.camera_adj_matrix[step]):
             if row == 1:
                 batch.append(i)
+        print(f"Camera batch: {batch}")
         return batch
 
     def get_train_loss_dict(self, step: int):
@@ -190,7 +202,6 @@ class InstructGS2GSPipeline(VanillaPipeline):
         self.makeSquentialEdits = ((step - 1) % self.config.gs_steps) == 0
 
         if self.makeSquentialEdits:
-            Path(self.img_outpath / str(step)).mkdir(parents=True, exist_ok=True)
             curr_edit_num = 0
             print(
                 f"Editing start with guidance scale {self.guidance_scale} and image guidance scale {self.image_guidance_scale}"
@@ -232,22 +243,18 @@ class InstructGS2GSPipeline(VanillaPipeline):
                 alpha_channel = original_image[:, 3, :, :].unsqueeze(1).to(edited_image.device)
                 edited_image = torch.cat([edited_image, alpha_channel], dim=1)
 
-                # edited_as_clip_format.update(
-                #     {
-                #         camera_index: (edited_batch[i, :3, :, :].unsqueeze(0) * 255).byte()
-                #         for i, camera_index in enumerate(batch_indeces)
-                #     }
-                # )
-
-                self.update_dataset(data, camera_idx, edited_image, original_image.dtype)
+                # store camera as json for debug
                 self.store_images(
+                    step=step,
+                    camera_index=camera_idx,
                     rendered=rendered_image,
                     original=original_image,
                     edited=edited_image,
                     depth=depth_image,
-                    step=step,
-                    camera_index=camera_idx,
                 )
+                self.store_camera_json(camera, step, camera_idx)
+
+                self.update_dataset(data, camera_idx, edited_image, original_image.dtype)
 
                 # increment curr edit idx
                 curr_edit_num += 1
@@ -268,33 +275,47 @@ class InstructGS2GSPipeline(VanillaPipeline):
 
         clip_average = 0
         fid = 0
-        # if (step % 10) == 0:
-        #     # clip_average, clip_matrix = self.do_csmv(rgb_stack)
-        #     fid = self.do_fid_batch(rendered=rgb_stack, original=original_images)
+
         with open(self.img_outpath / "losses.csv", "a+") as f:
             f.write(f"{step},{main_loss},{scale_reg},{metric},{clip_average},{fid},{gaussian}\n")
 
+        if step % 10 == 0 or self.makeSquentialEdits:
+            Path(self.img_outpath / str(step)).mkdir(parents=True, exist_ok=True)
+
+            # Store images for debugging
+            for camera_idx in range(0, len(self.datamanager.original_cached_train)):
+                camera, _ = self.datamanager.next_train_idx(camera_idx)
+                model_outputs = self.model(camera)
+
+                rendered_image = model_outputs["rgb"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
+                depth_image = model_outputs["depth"].detach().unsqueeze(dim=0).permute(0, 3, 1, 2)
+
+                self.store_images(
+                    step=step,
+                    camera_index=camera_idx,
+                    rendered=rendered_image,
+                    original=None,
+                    edited=None,
+                    depth=depth_image,
+                )
+                self.store_camera_json(camera, step, camera_idx)
+
         return model_outputs, loss_dict, metrics_dict
 
-    def update_dataset(self, batch: list, edited_images: torch.Tensor):
-        """Update dataset with new images"""
-        for tensor_index, camera_index in enumerate(batch):
-            _, data = self.datamanager.next_train_idx(camera_index)
-            edited_image = edited_images[tensor_index].permute(1, 2, 0)
-
-            # update dataset with edited image as H x W x C tensor
-            self.datamanager.cached_train[camera_index]["image"] = edited_image
-            self.datamanager.update_image_data(camera_index, edited_image)
-
     def update_dataset(self, data, camera_index: int, edited_image: torch.Tensor, dtype: torch.dtype = torch.float32):
-        """Update dataset with new images"""
-
+        """Update dataset ith edited image as H x W x C tensor"""
         edited_image = edited_image.squeeze().permute(1, 2, 0).to(dtype)
-
-        # update dataset with edited image as H x W x C tensor
-        self.datamanager.cached_train[camera_index]["image"] = edited_image
         self.datamanager.update_image_data(camera_index, edited_image)
-        data["image"] = edited_image.squeeze().permute(1, 2, 0)
+
+    def store_camera_json(self, camera, step, camera_idx):
+        camera_json = camera.to_json(0)
+        camera_json["camera_index"] = camera_idx
+
+        save_path = Path(self.img_outpath / str(step))
+        save_path.mkdir(parents=True, exist_ok=True)
+
+        with open(save_path / f"camera_{str(camera_idx)}.json", "w", encoding="UTF-8") as file:
+            json.dump(camera_json, file, indent=4)
 
     def compute_regional_losses(self, step: int):
 
@@ -318,6 +339,8 @@ class InstructGS2GSPipeline(VanillaPipeline):
         for camera_idx in camera_batch:
 
             camera, data = self.datamanager.next_train_idx(camera_idx)
+            # self.store_camera_json(camera, step, camera_idx)
+
             model_outputs = self.model(camera)
             metrics_dict = self.model.get_metrics_dict(model_outputs, data)
 
@@ -335,14 +358,14 @@ class InstructGS2GSPipeline(VanillaPipeline):
             scale_reg_list.append(scale_reg)
             metric_list.append(metric)
 
-            self.store_images(
-                step=step,
-                camera_index=camera_idx,
-                rendered=model_outputs["rgb"],
-                original=data["image"],
-                edited=None,
-                depth=model_outputs["depth"],
-            )
+            # self.store_images(
+            #     step=step,
+            #     camera_index=camera_idx,
+            #     rendered=model_outputs["rgb"],
+            #     original=self.datamanager.original_cached_train[camera_idx]["image"],
+            #     edited=None,
+            #     depth=model_outputs["depth"],
+            # )
 
         model_outputs = {
             "rgb": torch.stack(rgb_stack, dim=0),
@@ -365,31 +388,6 @@ class InstructGS2GSPipeline(VanillaPipeline):
         metrics_dict["psnr"] = average_metric
 
         return (model_outputs, loss_dict, metrics_dict, rgb_stack)
-
-    def store_images(
-        self,
-        batch: list,
-        rendered_images: torch.Tensor,
-        original_images: torch.Tensor,
-        edited_images: torch.Tensor,
-        step: int,
-    ):
-        for tensor_index, camera_index in enumerate(batch):
-            rendered_image = rendered_images[tensor_index]
-            original_image = original_images[tensor_index]
-            edited_image = edited_images[tensor_index]
-
-            # save rendered image
-            rendered_image = self.to_image(rendered_image.squeeze(0).permute(1, 2, 0))
-            rendered_image.save(Path(self.img_outpath / str(step) / f"{str(camera_index)}_render.png"))
-
-            # save original image
-            original_image = self.to_image(original_image.squeeze(0).permute(1, 2, 0))
-            original_image.save(Path(self.img_outpath / str(step) / f"{str(camera_index)}_original.png"))
-
-            # save edited image
-            result = self.to_image(edited_image.permute(1, 2, 0))
-            result.save(Path(self.img_outpath / str(step) / f"{str(camera_index)}_edited.png"))
 
     def store_images(
         self,
@@ -433,49 +431,12 @@ class InstructGS2GSPipeline(VanillaPipeline):
 
             if depth is not None:
                 # save depth image
-                depth_image = self.to_image(depth.squeeze(0).permute(1, 2, 0) if len(rendered.shape) == 4 else depth)
+                depth = depth.squeeze(0).permute(1, 2, 0) if len(depth.shape) == 4 else depth
+                torch.save(depth.reshape(height, width), save_path / f"{str(camera_index)}_depth.pt")
+
+                depth_image = self.to_image(depth)
                 depth_image.save(save_path / f"{str(camera_index)}_depth.png")
                 print("Depth image saved")
-
-    # def store_images(
-    #     self,
-    #     step: int,
-    #     camera_index: int,
-    #     rendered: Image = None,
-    #     original: Image = None,
-    #     edited: Image = None,
-    #     depth: Image = None,
-    # ):
-
-    #     save_path = Path(self.img_outpath / str(step))
-    #     save_path.mkdir(parents=True, exist_ok=True)
-
-    #     print(f"Saving images for camera index {camera_index}")
-
-    #     with torch.no_grad():
-    #         if rendered is not None:
-    #             # save rendered image
-    #             rendered_image = self.to_image(rendered)
-    #             rendered_image.save(save_path / f"{str(camera_index)}_render.png")
-    #             print("Rendered image saved")
-
-    #         if original is not None:
-    #             # save original image
-    #             original_image = self.to_image(original)
-    #             original_image.save(save_path / f"{str(camera_index)}_original.png")
-    #             print("Original image saved")
-
-    #         if edited is not None:
-    #             # save edited image
-    #             edited = self.to_image(edited)
-    #             edited.save(save_path / f"{str(camera_index)}_edited.png")
-    #             print("Edited image saved")
-
-    #         if depth is not None:
-    #             # save depth image
-    #             depth_image = self.to_image(depth)
-    #             depth_image.save(save_path / f"{str(camera_index)}_depth.png")
-    #             print("Depth image saved")
 
     def to_image(self, tensor: torch.Tensor) -> Image:
         """Convert a tensor to an image"""
