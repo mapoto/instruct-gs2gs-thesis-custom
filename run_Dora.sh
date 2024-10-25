@@ -7,15 +7,15 @@ prompts=("Turn it into an anime" "Make it look like Fauvism painting" "Turn into
 # Iterate over each prompt and execute the command
 for prompt in "${prompts[@]}"; do
     # Start the Python script in the background
-    /home/lucky/miniconda3/envs/igs2gs_custom/bin/python /home/lucky/miniconda3/envs/igs2gs_custom/lib/python3.8/site-packages/nerfstudio/scripts/train.py \
+    /home/lucky/miniconda3/envs/igs2gs_custom/bin/python ../nerfstudio/nerfstudio/scripts/train.py \
         igs2gs \
         --vis wandb \
         --experiment-name "Dora_grn_$prompt" \
         --pipeline.model.cull_alpha_thresh 0.005 \
         --pipeline.model.output-depth-during-training True \
         --pipeline.model.use_scale_regularization True \
-        --data ./data/Dora_grn/ \
-        --load-dir ./outputs/Dora_grn/splatfacto/2024-09-05_144004/nerfstudio_models/ \
+        --data /home/lucky/dataset/thesis_nerfstudio_data/coord_corrected/Dora_grn/ \
+        --load-dir ./outputs/Dora_grn/splatfacto/2024-10-21_180506/nerfstudio_models/ \
         --pipeline.prompt "$prompt" \
         --pipeline.guidance-scale 5 \
         --pipeline.image-guidance-scale 2 \
@@ -24,14 +24,13 @@ for prompt in "${prompts[@]}"; do
         --eval_mode all \
         --downscale-factor 4 \
         --load-3D-points True \
-        --load-3D-points True \
         --center-method none \
         --auto-scale-poses False \
         --orientation-method none &
 
 
     # Wait for 60 minutes
-    sleep 7200
+    sleep 3600
 
     # Terminate the previous execution
     kill $PID

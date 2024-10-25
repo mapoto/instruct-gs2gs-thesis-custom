@@ -146,10 +146,10 @@ class InstructGS2GSPipeline(VanillaPipeline):
         )
 
         CAM_ADJ_MATRICES = {
-            "Simon": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/simon.csv")).values),
-            "Dora": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/dora.csv")).values),
-            "Ephra": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/ephra.csv")).values),
-            "Irene": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/irene.csv")).values),
+            "Simon": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/simon.csv"), header=0).values),
+            "Dora": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/dora.csv"), header=0).values),
+            "Ephra": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/ephra.csv"), header=0).values),
+            "Irene": torch.tensor(pd.read_csv(Path("./igs2gs/adj_matrices/irene.csv"), header=0).values),
         }
 
         self.camera_adj_matrix = CAM_ADJ_MATRICES[self.config.dataset_name]

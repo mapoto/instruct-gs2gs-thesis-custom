@@ -2,7 +2,7 @@
 #!/bin/bash
 
 # Define an array of prompts
-prompts=("Turn it into an anime" "Make it look like Fauvism painting" "Turn into 3d model" "Give him red blue hair" "as if it were by modigliani" "make him smile" "make it look like a painting" "turn him into Tolkien Elf" "make it look like a pencil sketch" "make it look like a watercolor" )
+prompts=("Turn it into an anime" "Make it look like Fauvism painting" "Turn into 3d model" "Give him red hair and blue shirt" "as if it were by modigliani" "make him smile" "make it old" "turn him into Tolkien Elf" "make it look like a pencil sketch" "turn him into a baby" )
 
 # Iterate over each prompt and execute the command
 for prompt in "${prompts[@]}"; do
