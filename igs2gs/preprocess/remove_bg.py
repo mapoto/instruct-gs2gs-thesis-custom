@@ -5,14 +5,15 @@ from PIL import Image
 if __name__ == "__main__":
     remover = Remover()  # default setting
 
-    image_root_path = Path("/home/lucky/dataset/metashape_aligned/Irene_grn/images/")
+    image_root_path = Path("/home/lucky/dataset/initials/irene/")
 
     root_output_path = image_root_path.parent / "masked"
     root_output_path.mkdir(exist_ok=True)
     model_choices = ["u2net", "u2net_human_seg", "u2netp"]
 
     for image_path in image_root_path.glob("*.[jpJP][npNP]*[gG$]"):
-
+        if not ("render" in image_path.stem):
+            continue
         input_path = str(image_path)
         output_path = str(root_output_path / (image_path.stem + ".png"))
         img = Image.open(input_path).convert("RGB")  # read image

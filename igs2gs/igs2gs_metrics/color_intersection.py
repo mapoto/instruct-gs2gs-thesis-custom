@@ -74,15 +74,15 @@ def depth_as_normalized_camera_coords(depth_image, intrinsic_matrix):
 if __name__ == "__main__":
 
     DATA_PATH = Path(
-        "/media/lucky/486d4773-81cb-4c30-ae5f-8cd74b05a68a/Lucky_Thesis_Data/igs2gs/10-16-18-18_Dora_as-if-it-were-by-modigliani_42_5.0_0.5_2.0_0.2/30000"
+        "/media/lucky/486d4773-81cb-4c30-ae5f-8cd74b05a68a/Lucky_Thesis_Data/igs2gs/10-22-15-02_Ephra_turn-him-into-Tolkien-Elf_42_5.0_0.5_2.0_0.2/35000/"
     )
 
     # Load the point cloud from source camera
-    source = "18"
-    points18, colors18 = point_cloud_csv("/home/lucky/point_cloud_18_new.csv")
+    source = "1"
+    points18, colors18 = point_cloud_csv("/home/lucky/ephra_point_cloud_11_new.csv")
 
     # Target camera intrinsics and extrinsics
-    target = "8"
+    target = "2"
     camera_json = DATA_PATH / f"camera_{target}.json"
     camera_data = load_camera_data(camera_json)
 
@@ -135,9 +135,11 @@ if __name__ == "__main__":
 
     depth_intersection[uv_coord[1].astype(int), uv_coord[0].astype(int)] = depths * -1
     color_intersection[uv_coord[1].astype(int), uv_coord[0].astype(int)] = rgb
+    cv2.imwrite("/home/lucky/depth_intersection.png", depth_intersection * 255)
 
     # Covert to black and white image
     depth_intersection_binary = np.where(depth_intersection > 0, 1, 0)
+    cv2.imwrite("/home/lucky/depth_intersection_binary.png", depth_intersection_binary * 255)
 
     # Store depth intersection as an image
     cv2.imwrite("/home/lucky/color_intersection.png", color_intersection * 255 * depth_intersection_binary[:, :, None])

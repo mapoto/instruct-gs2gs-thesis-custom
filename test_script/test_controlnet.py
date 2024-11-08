@@ -27,9 +27,7 @@ def create_canny(image, low_threshold=100, high_threshold=200):
 
 def detect_poses(image):
     openpose = OpenposeDetector.from_pretrained("lllyasviel/ControlNet")
-    openpose_image = openpose(
-        image, include_face=True, include_hand=False, include_body=False
-    )
+    openpose_image = openpose(image, include_face=True, include_hand=False, include_body=False)
     return openpose_image
 
 
@@ -46,19 +44,13 @@ if __name__ == "__main__":
     image_path = "/media/lucky/486d4773-81cb-4c30-ae5f-8cd74b05a68a/Lucky_Thesis_Data/dataset/cv_people/20220629_sven/resized_images"
     mask_path = "/media/lucky/486d4773-81cb-4c30-ae5f-8cd74b05a68a/Lucky_Thesis_Data/dataset/cv_people/20220629_sven/resized_masks/"
 
+    style_path = "/home/lucky/Desktop/ig2g/25_13-30_Turn_it_into_an_anime_5.0_2.0/30001/2_edited.png"
+
     controlnets = [
-        ControlNetModel.from_pretrained(
-            "lllyasviel/control_v11e_sd15_ip2p", torch_dtype=torch.float16
-        ),
-        ControlNetModel.from_pretrained(
-            "lllyasviel/sd-controlnet-canny", torch_dtype=torch.float16
-        ),
-        ControlNetModel.from_pretrained(
-            "lllyasviel/sd-controlnet-openpose", torch_dtype=torch.float16
-        ),
-        ControlNetModel.from_pretrained(
-            "lllyasviel/sd-controlnet-depth", torch_dtype=torch.float16
-        ),
+        ControlNetModel.from_pretrained("lllyasviel/control_v11e_sd15_ip2p", torch_dtype=torch.float16),
+        ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny", torch_dtype=torch.float16),
+        ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-openpose", torch_dtype=torch.float16),
+        ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-depth", torch_dtype=torch.float16),
     ]
 
     pipe = StableDiffusionControlNetPipeline.from_pretrained(
@@ -74,9 +66,7 @@ if __name__ == "__main__":
 
     pipe.enable_xformers_memory_efficient_attention()
     pipe.enable_model_cpu_offload()
-    output_path = Path(
-        "./controlnet_output/" + datetime.datetime.now().strftime("%m%d_%H%M%S")
-    )
+    output_path = Path("./controlnet_output/" + datetime.datetime.now().strftime("%m%d_%H%M%S"))
     output_path.mkdir(parents=True, exist_ok=True)
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -88,6 +78,8 @@ if __name__ == "__main__":
     openpose_path.mkdir(parents=True, exist_ok=True)
     depth_path.mkdir(parents=True, exist_ok=True)
 
+    style_reference = load_image(style_path)
+
     for filename in Path(image_path).rglob("*.JPG"):
         print(filename.as_posix())
 
@@ -97,24 +89,9 @@ if __name__ == "__main__":
         openpose_image = detect_poses(image)
         depth_image = estimate_depth(image)
 
-        canny_image.save(
-            Path(
-                canny_path
-                / str(filename.name.removesuffix(filename.suffix) + "_canny.png")
-            )
-        )
-        openpose_image.save(
-            Path(
-                openpose_path
-                / str(filename.name.removesuffix(filename.suffix) + "_openpose.png")
-            )
-        )
-        depth_image.save(
-            Path(
-                depth_path
-                / str(filename.name.removesuffix(filename.suffix) + "_depth.png")
-            )
-        )
+        canny_image.save(Path(canny_path / str(filename.name.removesuffix(filename.suffix) + "_canny.png")))
+        openpose_image.save(Path(openpose_path / str(filename.name.removesuffix(filename.suffix) + "_openpose.png")))
+        depth_image.save(Path(depth_path / str(filename.name.removesuffix(filename.suffix) + "_depth.png")))
 
         conditioner = [image, canny_image, openpose_image, depth_image]
         generator = torch.Generator(device="cpu").manual_seed(33)
@@ -128,10 +105,6 @@ if __name__ == "__main__":
             controlnet_conditioning_scale=[1, 0.6, 0.7, 0.5],
         ).images[0]
 
-        image.save(
-            Path(
-                output_path / str(filename.name.removesuffix(filename.suffix) + ".png")
-            )
-        )
+        image.save(Path(output_path / str(filename.name.removesuffix(filename.suffix) + ".png")))
 
         pass

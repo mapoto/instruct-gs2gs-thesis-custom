@@ -1,11 +1,11 @@
 #!/bin/bash
-#!/bin/bash
 
 # Define an array of prompts
-prompts=("Turn it into an anime" "Make it look like Fauvism painting" "Turn into 3d model" "make it look like Edward Munch Painting" "as if it were by modigliani" "give a scar on his left cheek" "make it look like a painting" "draw him in black and white" "make it look like a pencil sketch" "make it look like a watercolor" )
+prompts=("turn her into a rabbit" "Make her James Bond" "Make it look like Van Gogh painting" "Give her red hair and blue shirt" "turn her into Tolkien Elf" "turn her into a baby")
+
 
 # Iterate over each prompt and execute the command
-for prompt in "${prompts[@]}"; do
+for prompt in "${prompts[@]}_1"; do
     # Start the Python script in the background
     /home/lucky/miniconda3/envs/igs2gs_custom/bin/python ../nerfstudio/nerfstudio/scripts/train.py \
         igs2gs \
@@ -17,7 +17,7 @@ for prompt in "${prompts[@]}"; do
         --data /home/lucky/dataset/thesis_nerfstudio_data/coord_corrected/Dora_grn/ \
         --load-dir ./outputs/Dora_grn/splatfacto/2024-10-21_180506/nerfstudio_models/ \
         --pipeline.prompt "$prompt" \
-        --pipeline.guidance-scale 5 \
+        --pipeline.guidance-scale 7.5 \
         --pipeline.image-guidance-scale 2 \
         --pipeline.dataset-name Dora \
         nerfstudio-data \
@@ -30,7 +30,7 @@ for prompt in "${prompts[@]}"; do
 
 
     # Wait for 60 minutes
-    sleep 3600
+    sleep 1800
 
     # Terminate the previous execution
     kill $PID

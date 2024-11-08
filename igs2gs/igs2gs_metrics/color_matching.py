@@ -1,47 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import plyfile
-from data_util import load_camera_data, parse_intrinsic, parse_transform
+from data_util import (
+    load_camera_data,
+    parse_intrinsic,
+    parse_transform,
+    read_depth,
+    read_colors_from_image,
+)
 import torch
 from pathlib import Path
 import cv2
 from PIL import Image
 
 import lpips
-
-
-def load_ply(file_path):
-    # Load the PLY file
-    ply_data = plyfile.PlyData.read(file_path)
-
-    # Extract the vertices
-    vertices = np.vstack([ply_data["vertex"]["x"], ply_data["vertex"]["y"], ply_data["vertex"]["z"]]).T
-
-    return vertices
-
-
-def read_colors_from_image(image_path) -> np.ndarray:
-    source_color_image = Image.open(image_path)
-    source_color_image = np.asarray(source_color_image)
-
-    colors_s = source_color_image.reshape(-1, 3) / 255.0  # Normalize RGB to [0, 1]
-    return colors_s
-
-
-def point_cloud_csv(file_path):
-
-    point_cloud = np.loadtxt(file_path, delimiter=",", skiprows=1)
-    colors = point_cloud[:, 3:]
-    points = point_cloud[:, :3]
-    return points, colors
-
-
-def read_depth(depth_path):
-    depth_map = torch.load(depth_path, weights_only=True).detach().cpu()
-    maxima = torch.max(depth_map)
-    mask = depth_map == maxima
-    depth_map[mask] = 0
-    return depth_map
 
 
 def depth_as_normalized_camera_coords(depth_image, intrinsic_matrix):
@@ -84,21 +55,93 @@ def validate_image_size(uv_coord, width, height):
     return uv_coord, valid
 
 
-def compute_lips(source_color_image: torch.Tensor, target_color_image: torch.Tensor):
+def point_cloud_csv(file_path):
 
-    # Downsample the image
-    source_color_image = torch.nn.functional.interpolate(source_color_image, scale_factor=0.25, mode="bilinear")
-    target_color_image = torch.nn.functional.interpolate(target_color_image, scale_factor=0.25, mode="bilinear")
+    point_cloud = np.loadtxt(file_path, delimiter=",", skiprows=1)
+    colors = point_cloud[:, 3:]
+    points = point_cloud[:, :3]
+    return points, colors
+
+
+def compute_lips(
+    source_color_image: torch.Tensor,
+    target_color_image: torch.Tensor,
+    use_vgg=False,
+    use_alex=False,
+    loss_fn_vgg=None,
+    loss_fn_alex=None,
+    scale_factor=None,
+):
+
+    if scale_factor is not None:
+        # Downsample the image
+        source_color_image = torch.nn.functional.interpolate(source_color_image, scale_factor=0.25, mode="bilinear")
+        target_color_image = torch.nn.functional.interpolate(target_color_image, scale_factor=0.25, mode="bilinear")
 
     # Compute LPIPS
-    loss_fn_vgg = lpips.LPIPS(net="vgg")
-    loss_fn_alex = lpips.LPIPS(net="alex")
+    if use_vgg:
+        if loss_fn_vgg is None:
+            loss_fn_vgg = lpips.LPIPS(net="vgg")
+    if use_alex:
+        if loss_fn_alex is None:
+            loss_fn_alex = lpips.LPIPS(net="alex")
 
     # Compute the LPIPS
-    loss_vgg = loss_fn_vgg(source_color_image, target_color_image)
-    loss_alex = loss_fn_alex(source_color_image, target_color_image)
+    loss_vgg = loss_fn_vgg(source_color_image, target_color_image) if loss_fn_vgg is not None else None
+    loss_alex = loss_fn_alex(source_color_image, target_color_image) if loss_fn_alex is not None else None
 
     return loss_vgg, loss_alex
+
+
+def compute_intersection(point_cloud, source_color, target_intrinsics, target_extrinsics, target_depth):
+    # Convert the point cloud to homogeneous coordinates source camera
+    point_cloud_homogeneous = np.hstack((point_cloud, np.ones((point_cloud.shape[0], 1))))
+
+    # Apply the extrinsic matrix to transform the point cloud to camera coordinates
+    camera_coords = np.linalg.inv(target_extrinsics) @ point_cloud_homogeneous.T
+
+    # Apply the intrinsic matrix to project the point to image coordinates
+    image_coords_homogeneous = target_intrinsics @ camera_coords[:3]
+
+    # Normalize the coordinates to get the 2D image coordinates
+    uv_coord = image_coords_homogeneous[:2] / image_coords_homogeneous[2]
+
+    # Mirror the x-axis to match the image coordinates
+    uv_coord[0] = target_intrinsics[0, 2] * 2 - uv_coord[0]
+
+    # Depth map from the target camera
+    target_depth_uv = depth_as_normalized_camera_coords(target_depth, target_intrinsics)
+    depths = target_depth_uv[2, :]
+
+    width = np.int64(target_intrinsics[0, 2] * 2)
+    height = np.int64(target_intrinsics[1, 2] * 2)
+
+    color_intersection = np.zeros(
+        (
+            height,
+            width,
+            3,
+        )
+    )
+    depth_intersection = np.zeros((height, width))
+
+    uv_coord, valid = validate_image_size(uv_coord, width, height)
+
+    colors = source_color[valid]
+    depths = depths[valid]
+
+    # BGR to RGB
+    rgb = colors[:, [2, 1, 0]]  # BGR to RGB
+
+    # Compute the depth intersection mask, If there is x,y duplicate takes the smaller one (most front)
+
+    negate_depths = depths * -1
+    depth_intersection[uv_coord[1].astype(int), uv_coord[0].astype(int)] = negate_depths
+
+    # Compute the color image from point cloud in target camera perpective
+    color_intersection[uv_coord[1].astype(int), uv_coord[0].astype(int)] = rgb
+
+    return depth_intersection, color_intersection
 
 
 if __name__ == "__main__":

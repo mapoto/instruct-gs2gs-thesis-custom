@@ -279,7 +279,7 @@ class InstructGS2GSPipeline(VanillaPipeline):
         with open(self.img_outpath / "losses.csv", "a+") as f:
             f.write(f"{step},{main_loss},{scale_reg},{metric},{clip_average},{fid},{gaussian}\n")
 
-        if step % 10 == 0 or self.makeSquentialEdits:
+        if step % 100 == 0 or self.makeSquentialEdits:
             Path(self.img_outpath / str(step)).mkdir(parents=True, exist_ok=True)
 
             # Store images for debugging
@@ -430,13 +430,13 @@ class InstructGS2GSPipeline(VanillaPipeline):
                 print("Edited image saved")
 
             if depth is not None:
-                # save depth image
+                # save depth map
                 depth = depth.squeeze(0).permute(1, 2, 0) if len(depth.shape) == 4 else depth
                 torch.save(depth.reshape(height, width), save_path / f"{str(camera_index)}_depth.pt")
 
-                depth_image = self.to_image(depth)
-                depth_image.save(save_path / f"{str(camera_index)}_depth.png")
-                print("Depth image saved")
+                # depth_image = self.to_image(depth)
+                # depth_image.save(save_path / f"{str(camera_index)}_depth.png")
+                print("Depth map saved")
 
     def to_image(self, tensor: torch.Tensor) -> Image:
         """Convert a tensor to an image"""

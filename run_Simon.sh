@@ -2,7 +2,10 @@
 #!/bin/bash
 
 # Define an array of prompts
-prompts=("Turn it into an anime" "Make it look like Fauvism painting" "Turn into 3d model" "Give him red hair and blue shirt" "as if it were by modigliani" "make him smile" "make it old" "turn him into Tolkien Elf" "make it look like a pencil sketch" "turn him into a baby" )
+# prompts=("Turn it into an anime" "Make it look like Fauvism painting" "Turn into 3d model" "Give him red hair and blue shirt" "as if it were by modigliani" "make him smile" "make it old" "turn him into Tolkien Elf" "make it look like a pencil sketch" "turn him into a baby" )
+
+prompts = ( "Turn him/her into a rabbit" "Make him/her James Bond" "Give a cowboy hat" "Make it look like Van Gogh painting" "Turn into 3D model" "Give him/her red hair and blue shirt" "Turn him/her into Tolkien Elf" "Turn him/her into a baby" )
+
 
 # Iterate over each prompt and execute the command
 for prompt in "${prompts[@]}"; do
@@ -17,8 +20,10 @@ for prompt in "${prompts[@]}"; do
         --data /home/lucky/dataset/thesis_nerfstudio_data/coord_corrected/Simon_grn/ \
         --load-dir ./outputs/Simon_grn/splatfacto/2024-10-21_192421/nerfstudio_models/ \
         --pipeline.prompt "$prompt" \
-        --pipeline.guidance-scale 5 \
+        --pipeline.guidance-scale 10 \
+        --pipeline.incremental-guidance-scale 0.2 \
         --pipeline.image-guidance-scale 2 \
+        --pipeline.incremental-image-guidance-scale 0\
         --pipeline.dataset-name Simon \
         nerfstudio-data \
         --eval_mode all \
@@ -28,9 +33,8 @@ for prompt in "${prompts[@]}"; do
         --auto-scale-poses False \
         --orientation-method none &
 
-
     # Wait for 60 minutes
-    sleep 2400
+    sleep 60
 
     # Terminate the previous execution
     kill $PID
