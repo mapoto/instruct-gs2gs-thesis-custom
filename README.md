@@ -24,7 +24,7 @@ This is fork of the [InstructGS2GS](https://github.com/cvachha/instruct-gs2gs) f
 
 ## About
 
-![teaser](tex\Figures\methods\lpips.jpg)
+![teaser](tex/Figures/methods/lpips.jpg)
 
 The main objective of this thesis was to explore suitable metrics for quantifying the multi-view consistency of a stylized human head avatar in 3D Gaussian Splatting. This objective was achieved through the following research tasks:
 
@@ -38,7 +38,7 @@ This thesis contributes to the field of 3D stylization and 3DGS in 3 ways. First
 
 ## Modifications
 
-![teaser](tex\Figures\methods\3dgs_loop.jpg)
+![teaser](tex/Figures/methods/3dgs_loop.jpg)
 Top: Original implementation. Bottom: Modified InstructGS2GS pipeline.
 
 ### Stylization setting
