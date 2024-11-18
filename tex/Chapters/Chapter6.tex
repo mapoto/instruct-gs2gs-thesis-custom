@@ -1,0 +1,26 @@
+\chapter{Conclusion}
+
+
+The main objective of this thesis was to explore the metrics for quantifying the multi-view consistency of head human avatars in 3D Gaussian Splatting. This objective is achieved by conducting several tasks and processes, which already were discussed in the previous chapters. To conclude this thesis, I would like to highlight the key findings gathered throughout the entire research process. 
+
+\section{The importance of preprocessing prior to 3DGS creation}
+Since InstructPix2Pix edits the rendering of the 3DGS scene, the quality of the stylization depends heavily on the quality of the original 3DGS and its training images. The training images should primarily consist of the subject being stylized—in this case, a frontal view of a human head. This ensures that InstructPix2Pix can produce high-quality edits. Additionally, the 3DGS scene should be largely free of noise, artifacts, and floaters, as these can be amplified by the InstructPix2Pix pipeline during editing cycles.
+
+For these reasons, proper image acquisition and preprocessing steps were conducted. The image acquisition process involved capturing the frontal views of a human head using a set of cameras from the 3DrecapSL structure or the Photodome. A green screen is also used to cover the background. During the preprocessing, the images were cropped to include only the human head, and the green screen background was removed. These steps improved the quality  of the training images and the 3DGS scene, which, in turn, enhanced the stylization quality. Having a clean and reliable 3DGS scene was crucial for accurately evaluating of the multi-view consistency of the stylized avatars.
+
+\section{Creating results with more control and reliability}
+Even with the preprocessing steps in place, the quality of the stylization can still be affected by the InstructPix2Pix pipeline and how it is used. InstructPix2Pix itself cannot produce globally consistent results and InstructGS2GS assumes that the various edited views will naturally converge in the 3DGS scene. However, this assumption is not always valid, as inconsistencies between the edited views can result in an avatar with poor visual quality, rendering it unusable for experimentation.
+
+To address this, the InstructGS2GS pipeline is modified to enhance the quality of the stylization in certain aspects and, more importantly, to provide greater control over the editing process. The modifications of the pipeline include:
+\begin{enumerate}
+    \item Setting a random seed for the InstructPix2Pix pipeline to ensure that the same edited views are produced each time the pipeline is run.
+    \item Rescheduling the editing process to ensure that it occurs for all views at once in the same 3DGS training iteration.
+    \item Using a lower initial textual prompt guidance scale and a higher initial image guidance scale to ensure that the edited views remain consistent with the original view.
+    \item Incrementally and slightly increasing the two guidance scales to ensure that 3DGS is properly edited.
+    \item Training the 3DGS scene with batches of adjacent views to increase the likelihood of consistent edits across views, leading to a more visually appealing 3DGS.
+\end{enumerate}
+
+With the modified pipeline, the resulting edited avatars are more likely to meet expectations based on the parameters set within the pipeline and the editing task that they were aimed for. As such, Consequently, a sufficient and well distributed set of edited avatars with varying quality can be produced for the evaluation of the multi-view consistency metrics for stylized avatars. However, this modification is not a complete solution to the problem of inconsistent edited views. 
+
+\section{Multi-view stylization (MVS) consistency metrics}
+As described in previous chapters, $\mathsf{LPIPS}(\varGamma)$, $\mathsf{RMSE}(\varGamma)$ and $\Delta E_{00}(\varGamma)$ are used as the metrics to compute the multi-view stylization (MVS) consistency of the stylized avatars (SAs). Based on the experiment using 64 SAs, I found that $\mathsf{LPIPS}(\varGamma)$ seems to give a misleading impression on the MVS consistency of the SAs at first due to extremely low values. However, $\mathsf{LPIPS}(\varGamma)$ corresponds directly to the overall qualitative analysis of the SAs. $\mathsf{RMSE}(\varGamma)$ and $\Delta E_{00}(\varGamma)$ proved to be more realiable metrics for comparing SAs of the same prompts as they showed a significant margin between SAs with qualitatively low and high MVS consistency. However, these two metrics did not generalize well across different prompts. More experiments are necessary to determine the reliability of these metrics on a larger set of stylization results. Finally, there remains a need to develop a more reliable and generalizable metric for MVS consistency of stylized avatars, along with improved evaluation technique, as already discussed in Section \ref{sec:oversight}.
