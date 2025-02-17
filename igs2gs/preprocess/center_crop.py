@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     # Iterate through all images. Matches JPG, jpg, PNG, png
     for path in images_path.glob("*.[jJpP][pPnN][gG]"):
-        image = Image.open(path).convert("RGB")  # Open image and ensure it's in RGB format
+        image = Image.open(path).convert("RGBA")  # Open image and ensure it's in RGB format
         image_tensor = transform(image).unsqueeze(0).to("cuda")  # Convert to tensor and move to GPU
 
         # Perform center crop on GPU
@@ -72,20 +72,13 @@ if __name__ == "__main__":
 
         # Convert tensor back to PIL image and save
         cropped_image_pil = to_pil(image_tensor_cropped.squeeze(0).cpu())
-        cropped_image_pil.save(output_path / path.name.replace("*.[jJpP][pPnN][gG]", ".JPG"), quality=100)
+        cropped_image_pil.save(output_path / path.name.replace("*.[jJpP][pPnN][gG]", ".png"), quality=100)
 
         if not args.resized:
             continue
 
-        # Resize the image using PyTorch on GPU
-        resized_image_tensor = T.functional.resize(
-            image_tensor_cropped, (resized_width, resized_height), interpolation=T.InterpolationMode.LANCZOS
-        )
-        resized_image_pil = to_pil(resized_image_tensor.squeeze(0).cpu())
-        resized_image_pil.save(output_path / path.name, quality=100)
-
     print("Done!")
 
     # create empty image
-    image = Image.new("RGB", (2048, 3060), (255, 255, 255))
-    image.save("background.jpg")
+    # image = Image.new("RGB", (2048, 3060), (255, 255, 255))
+    # image.save("background.jpg")

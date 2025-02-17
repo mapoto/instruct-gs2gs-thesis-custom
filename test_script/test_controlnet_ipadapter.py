@@ -6,6 +6,7 @@ from diffusers import (
     UniPCMultistepScheduler,
 )
 import torch
+import re
 
 from diffusers.utils import load_image
 from PIL import Image
@@ -26,15 +27,13 @@ def create_canny(image, low_threshold=100, high_threshold=200):
 
 
 def detect_poses(image):
-    openpose = OpenposeDetector.from_pretrained("lllyasviel/ControlNet")
-    openpose_image = openpose(
-        image, include_face=True, include_hand=False, include_body=False
-    )
+    openpose = OpenposeDetector.from_pretrained("lllyasviel/ControlNet").to("cuda:0")
+    openpose_image = openpose(image, include_face=True, include_hand=False, include_body=False)
     return openpose_image
 
 
 def estimate_depth(image):
-    depth_estimator = pipeline("depth-estimation")
+    depth_estimator = pipeline("depth-estimation", device="cuda:0")
     depth_image = depth_estimator(image)["depth"]
     depth_image = np.array(depth_image)
     depth_image = depth_image[:, :, None]
@@ -43,22 +42,16 @@ def estimate_depth(image):
 
 
 if __name__ == "__main__":
-    image_path = "/media/lucky/486d4773-81cb-4c30-ae5f-8cd74b05a68a/Lucky_Thesis_Data/dataset/cv_people/20220629_sven/resized_images"
+    image_path = "data/Simon_grn/images_4"
     mask_path = "/media/lucky/486d4773-81cb-4c30-ae5f-8cd74b05a68a/Lucky_Thesis_Data/dataset/cv_people/20220629_sven/resized_masks/"
 
+    style_path = "/home/lucky/Desktop/ig2g/25_13-30_Turn_it_into_an_anime_5.0_2.0/30001/2_edited.png"
+
     controlnets = [
-        ControlNetModel.from_pretrained(
-            "lllyasviel/control_v11e_sd15_ip2p", torch_dtype=torch.float16
-        ),
-        ControlNetModel.from_pretrained(
-            "lllyasviel/sd-controlnet-canny", torch_dtype=torch.float16
-        ),
-        ControlNetModel.from_pretrained(
-            "lllyasviel/sd-controlnet-openpose", torch_dtype=torch.float16
-        ),
-        ControlNetModel.from_pretrained(
-            "lllyasviel/sd-controlnet-depth", torch_dtype=torch.float16
-        ),
+        ControlNetModel.from_pretrained("lllyasviel/control_v11e_sd15_ip2p", torch_dtype=torch.float16),
+        ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny", torch_dtype=torch.float16),
+        ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-openpose", torch_dtype=torch.float16),
+        ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-depth", torch_dtype=torch.float16),
     ]
 
     pipe = StableDiffusionControlNetPipeline.from_pretrained(
@@ -66,22 +59,16 @@ if __name__ == "__main__":
         controlnet=controlnets,
         torch_dtype=torch.float16,
     )
-    pipe.to("cuda")
-    pipe.load_ip_adapter(
-        "h94/IP-Adapter", subfolder="models", weight_name="ip-adapter_sd15.bin"
-    )
+    pipe.to("cuda:0")
+    pipe.load_ip_adapter("h94/IP-Adapter", subfolder="models", weight_name="ip-adapter_sd15.bin")
 
-    prompt = "Turn him into a stone statue"
+    prompt = "a person in anime style"
 
     pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
     # pipe.enable_xformers_memory_efficient_attention()
-    pipe.enable_model_cpu_offload()
-    output_path = Path(
-        "./controlnet_ipadapter_output/"
-        + datetime.datetime.now().strftime("%m%d_%H%M%S")
-    )
-    output_path.mkdir(parents=True, exist_ok=True)
+    pipe.enable_model_cpu_offload(0)
+    output_path = Path("./controlnet_ipadapter_output/" + datetime.datetime.now().strftime("%m%d_%H%M%S"))
     output_path.mkdir(parents=True, exist_ok=True)
 
     canny_path = output_path / "canny"
@@ -92,38 +79,27 @@ if __name__ == "__main__":
     openpose_path.mkdir(parents=True, exist_ok=True)
     depth_path.mkdir(parents=True, exist_ok=True)
 
-    for filename in Path(image_path).rglob("*.JPG"):
+    style_reference = load_image(Path(style_path).as_posix())
+
+    for filename in Path(image_path).rglob("*.png"):
         print(filename.as_posix())
 
         # image = Image.open(filename)
         image = load_image(filename.as_posix())
 
-        ip_adapter_image = image
-        canny_image = create_canny(image)
-        openpose_image = detect_poses(image)
-        depth_image = estimate_depth(image)
+        ip_adapter_image = style_reference
+        canny_image = create_canny(image).resize(style_reference.size)
+        openpose_image = detect_poses(image).resize(style_reference.size)
+        depth_image = estimate_depth(image).resize(style_reference.size)
 
-        canny_image.save(
-            Path(
-                canny_path
-                / str(filename.name.removesuffix(filename.suffix) + "_canny.png")
-            )
-        )
-        openpose_image.save(
-            Path(
-                openpose_path
-                / str(filename.name.removesuffix(filename.suffix) + "_openpose.png")
-            )
-        )
-        depth_image.save(
-            Path(
-                depth_path
-                / str(filename.name.removesuffix(filename.suffix) + "_depth.png")
-            )
-        )
+        savename = filename.name.replace("." + filename.suffix, "")
+
+        canny_image.save(Path(canny_path / str(savename + "_canny.png")))
+        openpose_image.save(Path(openpose_path / str(savename + "_openpose.png")))
+        depth_image.save(Path(depth_path / str(savename + "_depth.png")))
 
         conditioner = [image, canny_image, openpose_image, depth_image]
-        generator = torch.Generator(device="cpu").manual_seed(33)
+        generator = torch.Generator(device="cpu").manual_seed(42)
 
         image = pipe(
             prompt,
@@ -132,13 +108,9 @@ if __name__ == "__main__":
             generator=generator,
             ip_adapter_image=ip_adapter_image,
             negative_prompt="monochrome, lowres, bad anatomy, worst quality, low quality",
-            controlnet_conditioning_scale=[1, 1, 1, 1],
+            controlnet_conditioning_scale=[0.2, 1, 1, 1],
         ).images[0]
 
-        image.save(
-            Path(
-                output_path / str(filename.name.removesuffix(filename.suffix) + ".png")
-            )
-        )
+        image.save(Path(output_path / str(savename + ".png")))
 
         pass
