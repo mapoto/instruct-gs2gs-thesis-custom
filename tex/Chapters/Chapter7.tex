@@ -1,0 +1,20 @@
+\chapter{Summary and Outlook}
+
+
+\section{Summary}
+The main objective of this thesis was to explore suitable metrics for quantifying the multi-view consistency of a stylized human head avatar in 3D Gaussian Splatting. This objective was achieved through the following research tasks:
+
+\begin{enumerate}[noitemsep]
+    \item Conducting a literature review on the current state of the art in 3D stylization and the metrics used to evaluate the quality of the stylized avatars.
+    \item Performing image acquisition on four human models and data preprocessing to obtain a and preprocessing the data to create a well-studied training dataset.
+    \item Generating high quality 3D Gaussian Splattings for the head human avatars of the four models.
+    \item Modifiying the InstructGS2GS pipeline to enhance the quality of the stylization and provide greater control over the editing process.
+    \item Developing and testing the multi-view consistency metrics for the stylized avatars based on the methods described in previous works.
+\end{enumerate}
+
+This thesis contributes to the field of 3D stylization and 3DGS in 3 ways. Firstly, it provides detailed documentation on creating a high quality a head avatar of a person, from image acquisition process to the 3D Gaussian Splatting. Secondly, it introduces a modified InstructGS2GS pipeline that enhances stylization quality and offers improved control over the editing process. Lastly, it presents the three multi-view consistency metrics for the stylized avatars and evaluates their reliability and generalizability.
+
+\section{Outlook}
+During the course of this research, several limitations and challenges were identified. In particular, problem of achieving consistent stylization across different views is proven to be the most challenging issue. However, in the months since the release of InstructGS2GS code base, several works have emerged that attempt to address this issue. Some of these works modified the diffusion process to ensure globally style consistent edited images. \Textcite{Chen.2024} computes the epipolar lines of certain camera views and injects these features into the denoising network of InstructPix2Pix to ensure that the stylization is constistent across views. \Textcite{Wu.2024} used depth conditioned ControlNet pipelines and integrated them into the rendering process to guide the stylization across multiple views. Other works, such as those by \Textcite{Zhang.2024}, \Textcite{Wang.2024} and \Textcite{Jaganathan.2024} contrained the changes to specific regions of interest within the 3DGS scene, aligning them to achieve consistent stylization. Although these approaches are promising and could potentially improve the multi-view consistency of the stylized avatars, their release came too late to be incorporated into this thesis. Additionally, the hardware requirements for these methods were prohibitively high and beyond what was available during this research. Nevertheless, these approaches are worth exploring in future studies.
+
+Finally, another limitation of this thesis is the small number of stylized avatars used to evaluate the multi-view consistency metrics, as well as the qualitative nature of the evaluation. Not all the metrics used in this thesis demonstrated generalizability across different prompts. Therefore, more experiments are necessary to determine their reliability on a larger set of stylization results. Future research could involve conducting more experiments with diverse prompts and a greater number of stylized avatars to better assess the reliability of the metrics. Furthermore, the experimental setup could be redesigned to include more observers in the evaluation process, providing deeper insights into the reliability of the metrics and the quality of the stylized avatars. Finally, given that the subject of stylization is human avatars, it would be valuable to conduct user studies in an immersive setting, such as virtual reality environments.

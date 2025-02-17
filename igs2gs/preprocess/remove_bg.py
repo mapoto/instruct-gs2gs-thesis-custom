@@ -5,7 +5,7 @@ from PIL import Image
 if __name__ == "__main__":
     remover = Remover()  # default setting
 
-    image_root_path = Path("/home/lucky/dataset/gauss-dataset/lucky_2/center_crop/images")
+    image_root_path = Path("/home/lucky/dataset/initials/irene/")
 
     root_output_path = image_root_path.parent / "masked"
     root_output_path.mkdir(exist_ok=True)

@@ -2,7 +2,8 @@
 #!/bin/bash
 
 # Define an array of prompts
-prompts=("Turn it into an anime" "Make it look like Fauvism painting" "Turn into 3d model" "Give him red hair and blue shirt" "as if it were by modigliani" "make him smile" "make it old" "turn him into Tolkien Elf" "make it look like a pencil sketch" "turn him into a baby" )
+prompts=("turn him into a rabbit" "Make him look like a cyborg" "Make him James Bond")
+# prompts=("Turn it into an anime" "Make it look like Fauvism painting" "Turn into 3d model" "Give him red hair and blue shirt" "as if it were by modigliani" "make him smile" "make it old" "turn him into Tolkien Elf" "make it look like a pencil sketch" "turn him into a baby" )
 
 # Iterate over each prompt and execute the command
 for prompt in "${prompts[@]}"; do
@@ -17,7 +18,7 @@ for prompt in "${prompts[@]}"; do
         --data /home/lucky/dataset/thesis_nerfstudio_data/coord_corrected/Ephra_grn/ \
         --load-dir ./outputs/Ephra_grn/splatfacto/2024-10-21_182658/nerfstudio_models \
         --pipeline.prompt "$prompt" \
-        --pipeline.guidance-scale 5 \
+        --pipeline.guidance-scale 7.5 \
         --pipeline.image-guidance-scale 2 \
         --pipeline.dataset-name Ephra \
         nerfstudio-data \
@@ -28,10 +29,19 @@ for prompt in "${prompts[@]}"; do
         --auto-scale-poses False \
         --orientation-method none &
 
+    # Store the PID of the last command executed
+    PID=$!
+
+    echo "Started processing: Prompt '$prompt'"
+    echo "PID: $PID"
+
 
     # Wait for 60 minutes
-    sleep 7200
+    sleep 2400
 
     # Terminate the previous execution
     kill $PID
+
+    echo "Terminated processing: Prompt '$prompt'"
+
 done
